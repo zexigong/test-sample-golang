@@ -1,0 +1,27 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: chi\nTest File Path: chi\\content_encoding_test.go\\\
+    content_encoding_test.go\nProject Programming Language: Go\nTesting Framework:\
+    \ go testing\n### Source File Content\n### Source File: chi\\content_encoding_test.go\\\
+    source_files\\content_encoding.go\npackage middleware\n\nimport (\n\t\"net/http\"\
+    \n\t\"strings\"\n)\n\n// AllowContentEncoding enforces a whitelist of request\
+    \ Content-Encoding otherwise responds\n// with a 415 Unsupported Media Type status.\n\
+    func AllowContentEncoding(contentEncoding ...string) func(next http.Handler) http.Handler\
+    \ {\n\tallowedEncodings := make(map[string]struct{}, len(contentEncoding))\n\t\
+    for _, encoding := range contentEncoding {\n\t\tallowedEncodings[strings.TrimSpace(strings.ToLower(encoding))]\
+    \ = struct{}{}\n\t}\n\treturn func(next http.Handler) http.Handler {\n\t\tfn :=\
+    \ func(w http.ResponseWriter, r *http.Request) {\n\t\t\trequestEncodings := r.Header[\"\
+    Content-Encoding\"]\n\t\t\t// skip check for empty content body or no Content-Encoding\n\
+    \t\t\tif r.ContentLength == 0 {\n\t\t\t\tnext.ServeHTTP(w, r)\n\t\t\t\treturn\n\
+    \t\t\t}\n\t\t\t// All encodings in the request must be allowed\n\t\t\tfor _, encoding\
+    \ := range requestEncodings {\n\t\t\t\tif _, ok := allowedEncodings[strings.TrimSpace(strings.ToLower(encoding))];\
+    \ !ok {\n\t\t\t\t\tw.WriteHeader(http.StatusUnsupportedMediaType)\n\t\t\t\t\t\
+    return\n\t\t\t\t}\n\t\t\t}\n\t\t\tnext.ServeHTTP(w, r)\n\t\t}\n\t\treturn http.HandlerFunc(fn)\n\
+    \t}\n}\n\n### Source File Dependency Files Content\n### Dependency File: empty.go\n\
+    \nOutput the complete test file, code only, no explanations.\n### Time\nCurrent\
+    \ time: 2025-03-23 22:48:29\n"
+  role: user

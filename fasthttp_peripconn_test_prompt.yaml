@@ -1,0 +1,44 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: fasthttp\nTest File Path: fasthttp\\peripconn_test.go\\\
+    peripconn_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: fasthttp\\peripconn_test.go\\source_files\\\
+    peripconn.go\npackage fasthttp\n\nimport (\n\t\"crypto/tls\"\n\t\"net\"\n\t\"\
+    sync\"\n)\n\ntype perIPConnCounter struct {\n\tperIPConnPool    sync.Pool\n\t\
+    perIPTLSConnPool sync.Pool\n\tm                map[uint32]int\n\tlock        \
+    \     sync.Mutex\n}\n\nfunc (cc *perIPConnCounter) Register(ip uint32) int {\n\
+    \tcc.lock.Lock()\n\tif cc.m == nil {\n\t\tcc.m = make(map[uint32]int)\n\t}\n\t\
+    n := cc.m[ip] + 1\n\tcc.m[ip] = n\n\tcc.lock.Unlock()\n\treturn n\n}\n\nfunc (cc\
+    \ *perIPConnCounter) Unregister(ip uint32) {\n\tcc.lock.Lock()\n\tdefer cc.lock.Unlock()\n\
+    \tif cc.m == nil {\n\t\t// developer safeguard\n\t\tpanic(\"BUG: perIPConnCounter.Register()\
+    \ wasn't called\")\n\t}\n\tn := cc.m[ip] - 1\n\tif n < 0 {\n\t\tn = 0\n\t}\n\t\
+    cc.m[ip] = n\n}\n\ntype perIPConn struct {\n\tnet.Conn\n\n\tperIPConnCounter *perIPConnCounter\n\
+    \n\tip uint32\n}\n\ntype perIPTLSConn struct {\n\t*tls.Conn\n\n\tperIPConnCounter\
+    \ *perIPConnCounter\n\n\tip uint32\n}\n\nfunc acquirePerIPConn(conn net.Conn,\
+    \ ip uint32, counter *perIPConnCounter) net.Conn {\n\tif tlsConn, ok := conn.(*tls.Conn);\
+    \ ok {\n\t\tv := counter.perIPTLSConnPool.Get()\n\t\tif v == nil {\n\t\t\treturn\
+    \ &perIPTLSConn{\n\t\t\t\tperIPConnCounter: counter,\n\t\t\t\tConn:          \
+    \   tlsConn,\n\t\t\t\tip:               ip,\n\t\t\t}\n\t\t}\n\t\tc := v.(*perIPTLSConn)\n\
+    \t\tc.Conn = tlsConn\n\t\tc.ip = ip\n\t\treturn c\n\t}\n\n\tv := counter.perIPConnPool.Get()\n\
+    \tif v == nil {\n\t\treturn &perIPConn{\n\t\t\tperIPConnCounter: counter,\n\t\t\
+    \tConn:             conn,\n\t\t\tip:               ip,\n\t\t}\n\t}\n\tc := v.(*perIPConn)\n\
+    \tc.Conn = conn\n\tc.ip = ip\n\treturn c\n}\n\nfunc (c *perIPConn) Close() error\
+    \ {\n\terr := c.Conn.Close()\n\tc.perIPConnCounter.Unregister(c.ip)\n\tc.Conn\
+    \ = nil\n\tc.perIPConnCounter.perIPConnPool.Put(c)\n\treturn err\n}\n\nfunc (c\
+    \ *perIPTLSConn) Close() error {\n\terr := c.Conn.Close()\n\tc.perIPConnCounter.Unregister(c.ip)\n\
+    \tc.Conn = nil\n\tc.perIPConnCounter.perIPTLSConnPool.Put(c)\n\treturn err\n}\n\
+    \nfunc getUint32IP(c net.Conn) uint32 {\n\treturn ip2uint32(getConnIP4(c))\n}\n\
+    \nfunc getConnIP4(c net.Conn) net.IP {\n\taddr := c.RemoteAddr()\n\tipAddr, ok\
+    \ := addr.(*net.TCPAddr)\n\tif !ok {\n\t\treturn net.IPv4zero\n\t}\n\treturn ipAddr.IP.To4()\n\
+    }\n\nfunc ip2uint32(ip net.IP) uint32 {\n\tif len(ip) != 4 {\n\t\treturn 0\n\t\
+    }\n\treturn uint32(ip[0])<<24 | uint32(ip[1])<<16 | uint32(ip[2])<<8 | uint32(ip[3])\n\
+    }\n\nfunc uint322ip(ip uint32) net.IP {\n\tb := make([]byte, 4)\n\tb[0] = byte(ip\
+    \ >> 24)\n\tb[1] = byte(ip >> 16)\n\tb[2] = byte(ip >> 8)\n\tb[3] = byte(ip)\n\
+    \treturn b\n}\n\n### Source File Dependency Files Content\n### Dependency File:\
+    \ empty.go\n\nOutput the complete test file, code only, no explanations.\n###\
+    \ Time\nCurrent time: 2025-03-23 23:29:40\n"
+  role: user

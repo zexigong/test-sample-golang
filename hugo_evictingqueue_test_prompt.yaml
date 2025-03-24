@@ -1,0 +1,49 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: hugo\nTest File Path: hugo\\evictingqueue_test.go\\\
+    evictingqueue_test.go\nProject Programming Language: Go\nTesting Framework: go\
+    \ testing\n### Source File Content\n### Source File: hugo\\evictingqueue_test.go\\\
+    source_files\\evictingqueue.go\n// Copyright 2017-present The Hugo Authors. All\
+    \ rights reserved.\n//\n// Licensed under the Apache License, Version 2.0 (the\
+    \ \"License\");\n// you may not use this file except in compliance with the License.\n\
+    // You may obtain a copy of the License at\n// http://www.apache.org/licenses/LICENSE-2.0\n\
+    //\n// Unless required by applicable law or agreed to in writing, software\n//\
+    \ distributed under the License is distributed on an \"AS IS\" BASIS,\n// WITHOUT\
+    \ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n// See the\
+    \ License for the specific language governing permissions and\n// limitations\
+    \ under the License.\n\n// Package types contains types shared between packages\
+    \ in Hugo.\npackage types\n\nimport (\n\t\"sync\"\n)\n\n// EvictingQueue is a\
+    \ queue which automatically evicts elements from the head of\n// the queue when\
+    \ attempting to add new elements onto the queue and it is full.\n// This queue\
+    \ orders elements LIFO (last-in-first-out). It throws away duplicates.\ntype EvictingQueue[T\
+    \ comparable] struct {\n\tsize int\n\tvals []T\n\tset  map[T]bool\n\tmu   sync.Mutex\n\
+    \tzero T\n}\n\n// NewEvictingQueue creates a new queue with the given size.\n\
+    func NewEvictingQueue[T comparable](size int) *EvictingQueue[T] {\n\treturn &EvictingQueue[T]{size:\
+    \ size, set: make(map[T]bool)}\n}\n\n// Add adds a new string to the tail of the\
+    \ queue if it's not already there.\nfunc (q *EvictingQueue[T]) Add(v T) *EvictingQueue[T]\
+    \ {\n\tq.mu.Lock()\n\tif q.set[v] {\n\t\tq.mu.Unlock()\n\t\treturn q\n\t}\n\n\t\
+    if len(q.set) == q.size {\n\t\t// Full\n\t\tdelete(q.set, q.vals[0])\n\t\tq.vals\
+    \ = append(q.vals[:0], q.vals[1:]...)\n\t}\n\tq.set[v] = true\n\tq.vals = append(q.vals,\
+    \ v)\n\tq.mu.Unlock()\n\n\treturn q\n}\n\nfunc (q *EvictingQueue[T]) Len() int\
+    \ {\n\tif q == nil {\n\t\treturn 0\n\t}\n\tq.mu.Lock()\n\tdefer q.mu.Unlock()\n\
+    \treturn len(q.vals)\n}\n\n// Contains returns whether the queue contains v.\n\
+    func (q *EvictingQueue[T]) Contains(v T) bool {\n\tif q == nil {\n\t\treturn false\n\
+    \t}\n\tq.mu.Lock()\n\tdefer q.mu.Unlock()\n\treturn q.set[v]\n}\n\n// Peek looks\
+    \ at the last element added to the queue.\nfunc (q *EvictingQueue[T]) Peek() T\
+    \ {\n\tq.mu.Lock()\n\tl := len(q.vals)\n\tif l == 0 {\n\t\tq.mu.Unlock()\n\t\t\
+    return q.zero\n\t}\n\telem := q.vals[l-1]\n\tq.mu.Unlock()\n\treturn elem\n}\n\
+    \n// PeekAll looks at all the elements in the queue, with the newest first.\n\
+    func (q *EvictingQueue[T]) PeekAll() []T {\n\tif q == nil {\n\t\treturn nil\n\t\
+    }\n\tq.mu.Lock()\n\tvals := make([]T, len(q.vals))\n\tcopy(vals, q.vals)\n\tq.mu.Unlock()\n\
+    \tfor i, j := 0, len(vals)-1; i < j; i, j = i+1, j-1 {\n\t\tvals[i], vals[j] =\
+    \ vals[j], vals[i]\n\t}\n\treturn vals\n}\n\n// PeekAllSet returns PeekAll as\
+    \ a set.\nfunc (q *EvictingQueue[T]) PeekAllSet() map[T]bool {\n\tall := q.PeekAll()\n\
+    \tset := make(map[T]bool)\n\tfor _, v := range all {\n\t\tset[v] = true\n\t}\n\
+    \n\treturn set\n}\n\n### Source File Dependency Files Content\n### Dependency\
+    \ File: empty.go\n\nOutput the complete test file, code only, no explanations.\n\
+    ### Time\nCurrent time: 2025-03-23 23:54:53\n"
+  role: user

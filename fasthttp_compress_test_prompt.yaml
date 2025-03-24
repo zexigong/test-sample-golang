@@ -1,0 +1,229 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: fasthttp\nTest File Path: fasthttp\\compress_test.go\\\
+    compress_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: fasthttp\\compress_test.go\\source_files\\\
+    compress.go\npackage fasthttp\n\nimport (\n\t\"bytes\"\n\t\"fmt\"\n\t\"io\"\n\t\
+    \"io/fs\"\n\t\"sync\"\n\n\t\"github.com/klauspost/compress/flate\"\n\t\"github.com/klauspost/compress/gzip\"\
+    \n\t\"github.com/klauspost/compress/zlib\"\n\t\"github.com/valyala/bytebufferpool\"\
+    \n\t\"github.com/valyala/fasthttp/stackless\"\n)\n\n// Supported compression levels.\n\
+    const (\n\tCompressNoCompression      = flate.NoCompression\n\tCompressBestSpeed\
+    \          = flate.BestSpeed\n\tCompressBestCompression    = flate.BestCompression\n\
+    \tCompressDefaultCompression = 6  // flate.DefaultCompression\n\tCompressHuffmanOnly\
+    \        = -2 // flate.HuffmanOnly\n)\n\nfunc acquireGzipReader(r io.Reader) (*gzip.Reader,\
+    \ error) {\n\tv := gzipReaderPool.Get()\n\tif v == nil {\n\t\treturn gzip.NewReader(r)\n\
+    \t}\n\tzr := v.(*gzip.Reader)\n\tif err := zr.Reset(r); err != nil {\n\t\treturn\
+    \ nil, err\n\t}\n\treturn zr, nil\n}\n\nfunc releaseGzipReader(zr *gzip.Reader)\
+    \ {\n\tzr.Close()\n\tgzipReaderPool.Put(zr)\n}\n\nvar gzipReaderPool sync.Pool\n\
+    \nfunc acquireFlateReader(r io.Reader) (io.ReadCloser, error) {\n\tv := flateReaderPool.Get()\n\
+    \tif v == nil {\n\t\tzr, err := zlib.NewReader(r)\n\t\tif err != nil {\n\t\t\t\
+    return nil, err\n\t\t}\n\t\treturn zr, nil\n\t}\n\tzr := v.(io.ReadCloser)\n\t\
+    if err := resetFlateReader(zr, r); err != nil {\n\t\treturn nil, err\n\t}\n\t\
+    return zr, nil\n}\n\nfunc releaseFlateReader(zr io.ReadCloser) {\n\tzr.Close()\n\
+    \tflateReaderPool.Put(zr)\n}\n\nfunc resetFlateReader(zr io.ReadCloser, r io.Reader)\
+    \ error {\n\tzrr, ok := zr.(zlib.Resetter)\n\tif !ok {\n\t\t// sanity check. should\
+    \ only be called with a zlib.Reader\n\t\tpanic(\"BUG: zlib.Reader doesn't implement\
+    \ zlib.Resetter???\")\n\t}\n\treturn zrr.Reset(r, nil)\n}\n\nvar flateReaderPool\
+    \ sync.Pool\n\nfunc acquireStacklessGzipWriter(w io.Writer, level int) stackless.Writer\
+    \ {\n\tnLevel := normalizeCompressLevel(level)\n\tp := stacklessGzipWriterPoolMap[nLevel]\n\
+    \tv := p.Get()\n\tif v == nil {\n\t\treturn stackless.NewWriter(w, func(w io.Writer)\
+    \ stackless.Writer {\n\t\t\treturn acquireRealGzipWriter(w, level)\n\t\t})\n\t\
+    }\n\tsw := v.(stackless.Writer)\n\tsw.Reset(w)\n\treturn sw\n}\n\nfunc releaseStacklessGzipWriter(sw\
+    \ stackless.Writer, level int) {\n\tsw.Close()\n\tnLevel := normalizeCompressLevel(level)\n\
+    \tp := stacklessGzipWriterPoolMap[nLevel]\n\tp.Put(sw)\n}\n\nfunc acquireRealGzipWriter(w\
+    \ io.Writer, level int) *gzip.Writer {\n\tnLevel := normalizeCompressLevel(level)\n\
+    \tp := realGzipWriterPoolMap[nLevel]\n\tv := p.Get()\n\tif v == nil {\n\t\tzw,\
+    \ err := gzip.NewWriterLevel(w, level)\n\t\tif err != nil {\n\t\t\t// gzip.NewWriterLevel\
+    \ only errors for invalid\n\t\t\t// compression levels. Clamp it to be min or\
+    \ max.\n\t\t\tif level < gzip.HuffmanOnly {\n\t\t\t\tlevel = gzip.HuffmanOnly\n\
+    \t\t\t} else {\n\t\t\t\tlevel = gzip.BestCompression\n\t\t\t}\n\t\t\tzw, _ = gzip.NewWriterLevel(w,\
+    \ level)\n\t\t}\n\t\treturn zw\n\t}\n\tzw := v.(*gzip.Writer)\n\tzw.Reset(w)\n\
+    \treturn zw\n}\n\nfunc releaseRealGzipWriter(zw *gzip.Writer, level int) {\n\t\
+    zw.Close()\n\tnLevel := normalizeCompressLevel(level)\n\tp := realGzipWriterPoolMap[nLevel]\n\
+    \tp.Put(zw)\n}\n\nvar (\n\tstacklessGzipWriterPoolMap = newCompressWriterPoolMap()\n\
+    \trealGzipWriterPoolMap      = newCompressWriterPoolMap()\n)\n\n// AppendGzipBytesLevel\
+    \ appends gzipped src to dst using the given\n// compression level and returns\
+    \ the resulting dst.\n//\n// Supported compression levels are:\n//\n//   - CompressNoCompression\n\
+    //   - CompressBestSpeed\n//   - CompressBestCompression\n//   - CompressDefaultCompression\n\
+    //   - CompressHuffmanOnly\nfunc AppendGzipBytesLevel(dst, src []byte, level int)\
+    \ []byte {\n\tw := &byteSliceWriter{b: dst}\n\tWriteGzipLevel(w, src, level) //nolint:errcheck\n\
+    \treturn w.b\n}\n\n// WriteGzipLevel writes gzipped p to w using the given compression\
+    \ level\n// and returns the number of compressed bytes written to w.\n//\n// Supported\
+    \ compression levels are:\n//\n//   - CompressNoCompression\n//   - CompressBestSpeed\n\
+    //   - CompressBestCompression\n//   - CompressDefaultCompression\n//   - CompressHuffmanOnly\n\
+    func WriteGzipLevel(w io.Writer, p []byte, level int) (int, error) {\n\tswitch\
+    \ w.(type) {\n\tcase *byteSliceWriter,\n\t\t*bytes.Buffer,\n\t\t*bytebufferpool.ByteBuffer:\n\
+    \t\t// These writers don't block, so we can just use stacklessWriteGzip\n\t\t\
+    ctx := &compressCtx{\n\t\t\tw:     w,\n\t\t\tp:     p,\n\t\t\tlevel: level,\n\t\
+    \t}\n\t\tstacklessWriteGzip(ctx)\n\t\treturn len(p), nil\n\tdefault:\n\t\tzw :=\
+    \ acquireStacklessGzipWriter(w, level)\n\t\tn, err := zw.Write(p)\n\t\treleaseStacklessGzipWriter(zw,\
+    \ level)\n\t\treturn n, err\n\t}\n}\n\nvar (\n\tstacklessWriteGzipOnce sync.Once\n\
+    \tstacklessWriteGzipFunc func(ctx any) bool\n)\n\nfunc stacklessWriteGzip(ctx\
+    \ any) {\n\tstacklessWriteGzipOnce.Do(func() {\n\t\tstacklessWriteGzipFunc = stackless.NewFunc(nonblockingWriteGzip)\n\
+    \t})\n\tstacklessWriteGzipFunc(ctx)\n}\n\nfunc nonblockingWriteGzip(ctxv any)\
+    \ {\n\tctx := ctxv.(*compressCtx)\n\tzw := acquireRealGzipWriter(ctx.w, ctx.level)\n\
+    \n\tzw.Write(ctx.p) //nolint:errcheck // no way to handle this error anyway\n\n\
+    \treleaseRealGzipWriter(zw, ctx.level)\n}\n\n// WriteGzip writes gzipped p to\
+    \ w and returns the number of compressed\n// bytes written to w.\nfunc WriteGzip(w\
+    \ io.Writer, p []byte) (int, error) {\n\treturn WriteGzipLevel(w, p, CompressDefaultCompression)\n\
+    }\n\n// AppendGzipBytes appends gzipped src to dst and returns the resulting dst.\n\
+    func AppendGzipBytes(dst, src []byte) []byte {\n\treturn AppendGzipBytesLevel(dst,\
+    \ src, CompressDefaultCompression)\n}\n\n// WriteGunzip writes ungzipped p to\
+    \ w and returns the number of uncompressed\n// bytes written to w.\nfunc WriteGunzip(w\
+    \ io.Writer, p []byte) (int, error) {\n\tr := &byteSliceReader{b: p}\n\tzr, err\
+    \ := acquireGzipReader(r)\n\tif err != nil {\n\t\treturn 0, err\n\t}\n\tn, err\
+    \ := copyZeroAlloc(w, zr)\n\treleaseGzipReader(zr)\n\tnn := int(n)\n\tif int64(nn)\
+    \ != n {\n\t\treturn 0, fmt.Errorf(\"too much data gunzipped: %d\", n)\n\t}\n\t\
+    return nn, err\n}\n\n// AppendGunzipBytes appends gunzipped src to dst and returns\
+    \ the resulting dst.\nfunc AppendGunzipBytes(dst, src []byte) ([]byte, error)\
+    \ {\n\tw := &byteSliceWriter{b: dst}\n\t_, err := WriteGunzip(w, src)\n\treturn\
+    \ w.b, err\n}\n\n// AppendDeflateBytesLevel appends deflated src to dst using\
+    \ the given\n// compression level and returns the resulting dst.\n//\n// Supported\
+    \ compression levels are:\n//\n//   - CompressNoCompression\n//   - CompressBestSpeed\n\
+    //   - CompressBestCompression\n//   - CompressDefaultCompression\n//   - CompressHuffmanOnly\n\
+    func AppendDeflateBytesLevel(dst, src []byte, level int) []byte {\n\tw := &byteSliceWriter{b:\
+    \ dst}\n\tWriteDeflateLevel(w, src, level) //nolint:errcheck\n\treturn w.b\n}\n\
+    \n// WriteDeflateLevel writes deflated p to w using the given compression level\n\
+    // and returns the number of compressed bytes written to w.\n//\n// Supported\
+    \ compression levels are:\n//\n//   - CompressNoCompression\n//   - CompressBestSpeed\n\
+    //   - CompressBestCompression\n//   - CompressDefaultCompression\n//   - CompressHuffmanOnly\n\
+    func WriteDeflateLevel(w io.Writer, p []byte, level int) (int, error) {\n\tswitch\
+    \ w.(type) {\n\tcase *byteSliceWriter,\n\t\t*bytes.Buffer,\n\t\t*bytebufferpool.ByteBuffer:\n\
+    \t\t// These writers don't block, so we can just use stacklessWriteDeflate\n\t\
+    \tctx := &compressCtx{\n\t\t\tw:     w,\n\t\t\tp:     p,\n\t\t\tlevel: level,\n\
+    \t\t}\n\t\tstacklessWriteDeflate(ctx)\n\t\treturn len(p), nil\n\tdefault:\n\t\t\
+    zw := acquireStacklessDeflateWriter(w, level)\n\t\tn, err := zw.Write(p)\n\t\t\
+    releaseStacklessDeflateWriter(zw, level)\n\t\treturn n, err\n\t}\n}\n\nvar (\n\
+    \tstacklessWriteDeflateOnce sync.Once\n\tstacklessWriteDeflateFunc func(ctx any)\
+    \ bool\n)\n\nfunc stacklessWriteDeflate(ctx any) {\n\tstacklessWriteDeflateOnce.Do(func()\
+    \ {\n\t\tstacklessWriteDeflateFunc = stackless.NewFunc(nonblockingWriteDeflate)\n\
+    \t})\n\tstacklessWriteDeflateFunc(ctx)\n}\n\nfunc nonblockingWriteDeflate(ctxv\
+    \ any) {\n\tctx := ctxv.(*compressCtx)\n\tzw := acquireRealDeflateWriter(ctx.w,\
+    \ ctx.level)\n\n\tzw.Write(ctx.p) //nolint:errcheck // no way to handle this error\
+    \ anyway\n\n\treleaseRealDeflateWriter(zw, ctx.level)\n}\n\ntype compressCtx struct\
+    \ {\n\tw     io.Writer\n\tp     []byte\n\tlevel int\n}\n\n// WriteDeflate writes\
+    \ deflated p to w and returns the number of compressed\n// bytes written to w.\n\
+    func WriteDeflate(w io.Writer, p []byte) (int, error) {\n\treturn WriteDeflateLevel(w,\
+    \ p, CompressDefaultCompression)\n}\n\n// AppendDeflateBytes appends deflated\
+    \ src to dst and returns the resulting dst.\nfunc AppendDeflateBytes(dst, src\
+    \ []byte) []byte {\n\treturn AppendDeflateBytesLevel(dst, src, CompressDefaultCompression)\n\
+    }\n\n// WriteInflate writes inflated p to w and returns the number of uncompressed\n\
+    // bytes written to w.\nfunc WriteInflate(w io.Writer, p []byte) (int, error)\
+    \ {\n\tr := &byteSliceReader{b: p}\n\tzr, err := acquireFlateReader(r)\n\tif err\
+    \ != nil {\n\t\treturn 0, err\n\t}\n\tn, err := copyZeroAlloc(w, zr)\n\treleaseFlateReader(zr)\n\
+    \tnn := int(n)\n\tif int64(nn) != n {\n\t\treturn 0, fmt.Errorf(\"too much data\
+    \ inflated: %d\", n)\n\t}\n\treturn nn, err\n}\n\n// AppendInflateBytes appends\
+    \ inflated src to dst and returns the resulting dst.\nfunc AppendInflateBytes(dst,\
+    \ src []byte) ([]byte, error) {\n\tw := &byteSliceWriter{b: dst}\n\t_, err :=\
+    \ WriteInflate(w, src)\n\treturn w.b, err\n}\n\ntype byteSliceWriter struct {\n\
+    \tb []byte\n}\n\nfunc (w *byteSliceWriter) Write(p []byte) (int, error) {\n\t\
+    w.b = append(w.b, p...)\n\treturn len(p), nil\n}\n\ntype byteSliceReader struct\
+    \ {\n\tb []byte\n}\n\nfunc (r *byteSliceReader) Read(p []byte) (int, error) {\n\
+    \tif len(r.b) == 0 {\n\t\treturn 0, io.EOF\n\t}\n\tn := copy(p, r.b)\n\tr.b =\
+    \ r.b[n:]\n\treturn n, nil\n}\n\nfunc (r *byteSliceReader) ReadByte() (byte, error)\
+    \ {\n\tif len(r.b) == 0 {\n\t\treturn 0, io.EOF\n\t}\n\tn := r.b[0]\n\tr.b = r.b[1:]\n\
+    \treturn n, nil\n}\n\nfunc acquireStacklessDeflateWriter(w io.Writer, level int)\
+    \ stackless.Writer {\n\tnLevel := normalizeCompressLevel(level)\n\tp := stacklessDeflateWriterPoolMap[nLevel]\n\
+    \tv := p.Get()\n\tif v == nil {\n\t\treturn stackless.NewWriter(w, func(w io.Writer)\
+    \ stackless.Writer {\n\t\t\treturn acquireRealDeflateWriter(w, level)\n\t\t})\n\
+    \t}\n\tsw := v.(stackless.Writer)\n\tsw.Reset(w)\n\treturn sw\n}\n\nfunc releaseStacklessDeflateWriter(sw\
+    \ stackless.Writer, level int) {\n\tsw.Close()\n\tnLevel := normalizeCompressLevel(level)\n\
+    \tp := stacklessDeflateWriterPoolMap[nLevel]\n\tp.Put(sw)\n}\n\nfunc acquireRealDeflateWriter(w\
+    \ io.Writer, level int) *zlib.Writer {\n\tnLevel := normalizeCompressLevel(level)\n\
+    \tp := realDeflateWriterPoolMap[nLevel]\n\tv := p.Get()\n\tif v == nil {\n\t\t\
+    zw, err := zlib.NewWriterLevel(w, level)\n\t\tif err != nil {\n\t\t\t// zlib.NewWriterLevel\
+    \ only errors for invalid\n\t\t\t// compression levels. Clamp it to be min or\
+    \ max.\n\t\t\tif level < zlib.HuffmanOnly {\n\t\t\t\tlevel = zlib.HuffmanOnly\n\
+    \t\t\t} else {\n\t\t\t\tlevel = zlib.BestCompression\n\t\t\t}\n\t\t\tzw, _ = zlib.NewWriterLevel(w,\
+    \ level)\n\t\t}\n\t\treturn zw\n\t}\n\tzw := v.(*zlib.Writer)\n\tzw.Reset(w)\n\
+    \treturn zw\n}\n\nfunc releaseRealDeflateWriter(zw *zlib.Writer, level int) {\n\
+    \tzw.Close()\n\tnLevel := normalizeCompressLevel(level)\n\tp := realDeflateWriterPoolMap[nLevel]\n\
+    \tp.Put(zw)\n}\n\nvar (\n\tstacklessDeflateWriterPoolMap = newCompressWriterPoolMap()\n\
+    \trealDeflateWriterPoolMap      = newCompressWriterPoolMap()\n)\n\nfunc newCompressWriterPoolMap()\
+    \ []*sync.Pool {\n\t// Initialize pools for all the compression levels defined\n\
+    \t// in https://pkg.go.dev/compress/flate#pkg-constants .\n\t// Compression levels\
+    \ are normalized with normalizeCompressLevel,\n\t// so the fit [0..11].\n\tvar\
+    \ m []*sync.Pool\n\tfor i := 0; i < 12; i++ {\n\t\tm = append(m, &sync.Pool{})\n\
+    \t}\n\treturn m\n}\n\nfunc isFileCompressible(f fs.File, minCompressRatio float64)\
+    \ bool {\n\t// Try compressing the first 4kb of the file\n\t// and see if it can\
+    \ be compressed by more than\n\t// the given minCompressRatio.\n\tb := bytebufferpool.Get()\n\
+    \tzw := acquireStacklessGzipWriter(b, CompressDefaultCompression)\n\tlr := &io.LimitedReader{\n\
+    \t\tR: f,\n\t\tN: 4096,\n\t}\n\t_, err := copyZeroAlloc(zw, lr)\n\treleaseStacklessGzipWriter(zw,\
+    \ CompressDefaultCompression)\n\tseeker, ok := f.(io.Seeker)\n\tif !ok {\n\t\t\
+    return false\n\t}\n\tseeker.Seek(0, io.SeekStart) //nolint:errcheck\n\tif err\
+    \ != nil {\n\t\treturn false\n\t}\n\n\tn := 4096 - lr.N\n\tzn := len(b.B)\n\t\
+    bytebufferpool.Put(b)\n\treturn float64(zn) < float64(n)*minCompressRatio\n}\n\
+    \n// normalizes compression level into [0..11], so it could be used as an index\n\
+    // in *PoolMap.\nfunc normalizeCompressLevel(level int) int {\n\t// -2 is the\
+    \ lowest compression level - CompressHuffmanOnly\n\t// 9 is the highest compression\
+    \ level - CompressBestCompression\n\tif level < -2 || level > 9 {\n\t\tlevel =\
+    \ CompressDefaultCompression\n\t}\n\treturn level + 2\n}\n\n### Source File Dependency\
+    \ Files Content\n### Dependency File: fasthttp\\compress_test.go\\dependent_files\\\
+    doc.go\n// Package stackless provides functionality that may save stack space\n\
+    // for high number of concurrently running goroutines.\npackage stackless\n\n\n\
+    ### Dependency File: fasthttp\\compress_test.go\\dependent_files\\func.go\npackage\
+    \ stackless\n\nimport (\n\t\"runtime\"\n\t\"sync\"\n)\n\n// NewFunc returns stackless\
+    \ wrapper for the function f.\n//\n// Unlike f, the returned stackless wrapper\
+    \ doesn't use stack space\n// on the goroutine that calls it.\n// The wrapper\
+    \ may save a lot of stack space if the following conditions\n// are met:\n//\n\
+    //   - f doesn't contain blocking calls on network, I/O or channels;\n//   - f\
+    \ uses a lot of stack space;\n//   - the wrapper is called from high number of\
+    \ concurrent goroutines.\n//\n// The stackless wrapper returns false if the call\
+    \ cannot be processed\n// at the moment due to high load.\nfunc NewFunc(f func(ctx\
+    \ any)) func(ctx any) bool {\n\tif f == nil {\n\t\t// developer sanity-check\n\
+    \t\tpanic(\"BUG: f cannot be nil\")\n\t}\n\n\tfuncWorkCh := make(chan *funcWork,\
+    \ runtime.GOMAXPROCS(-1)*2048)\n\tonceInit := func() {\n\t\tn := runtime.GOMAXPROCS(-1)\n\
+    \t\tfor i := 0; i < n; i++ {\n\t\t\tgo funcWorker(funcWorkCh, f)\n\t\t}\n\t}\n\
+    \tvar once sync.Once\n\n\treturn func(ctx any) bool {\n\t\tonce.Do(onceInit)\n\
+    \t\tfw := getFuncWork()\n\t\tfw.ctx = ctx\n\n\t\tselect {\n\t\tcase funcWorkCh\
+    \ <- fw:\n\t\tdefault:\n\t\t\tputFuncWork(fw)\n\t\t\treturn false\n\t\t}\n\t\t\
+    <-fw.done\n\t\tputFuncWork(fw)\n\t\treturn true\n\t}\n}\n\nfunc funcWorker(funcWorkCh\
+    \ <-chan *funcWork, f func(ctx any)) {\n\tfor fw := range funcWorkCh {\n\t\tf(fw.ctx)\n\
+    \t\tfw.done <- struct{}{}\n\t}\n}\n\nfunc getFuncWork() *funcWork {\n\tv := funcWorkPool.Get()\n\
+    \tif v == nil {\n\t\tv = &funcWork{\n\t\t\tdone: make(chan struct{}, 1),\n\t\t\
+    }\n\t}\n\treturn v.(*funcWork)\n}\n\nfunc putFuncWork(fw *funcWork) {\n\tfw.ctx\
+    \ = nil\n\tfuncWorkPool.Put(fw)\n}\n\nvar funcWorkPool sync.Pool\n\ntype funcWork\
+    \ struct {\n\tctx  any\n\tdone chan struct{}\n}\n\n\n### Dependency File: fasthttp\\\
+    compress_test.go\\dependent_files\\writer.go\npackage stackless\n\nimport (\n\t\
+    \"errors\"\n\t\"fmt\"\n\t\"io\"\n\t\"sync\"\n\n\t\"github.com/valyala/bytebufferpool\"\
+    \n)\n\n// Writer is an interface stackless writer must conform to.\n//\n// The\
+    \ interface contains common subset for Writers from compress/* packages.\ntype\
+    \ Writer interface {\n\tWrite(p []byte) (int, error)\n\tFlush() error\n\tClose()\
+    \ error\n\tReset(w io.Writer)\n}\n\n// NewWriterFunc must return new writer that\
+    \ will be wrapped into\n// stackless writer.\ntype NewWriterFunc func(w io.Writer)\
+    \ Writer\n\n// NewWriter creates a stackless writer around a writer returned\n\
+    // from newWriter.\n//\n// The returned writer writes data to dstW.\n//\n// Writers\
+    \ that use a lot of stack space may be wrapped into stackless writer,\n// thus\
+    \ saving stack space for high number of concurrently running goroutines.\nfunc\
+    \ NewWriter(dstW io.Writer, newWriter NewWriterFunc) Writer {\n\tw := &writer{\n\
+    \t\tdstW: dstW,\n\t}\n\tw.zw = newWriter(&w.xw)\n\treturn w\n}\n\ntype writer\
+    \ struct {\n\tdstW io.Writer\n\tzw   Writer\n\n\terr error\n\txw  xWriter\n\n\t\
+    p []byte\n\tn int\n\n\top op\n}\n\ntype op int\n\nconst (\n\topWrite op = iota\n\
+    \topFlush\n\topClose\n\topReset\n)\n\nfunc (w *writer) Write(p []byte) (int, error)\
+    \ {\n\tw.p = p\n\terr := w.do(opWrite)\n\tw.p = nil\n\treturn w.n, err\n}\n\n\
+    func (w *writer) Flush() error {\n\treturn w.do(opFlush)\n}\n\nfunc (w *writer)\
+    \ Close() error {\n\treturn w.do(opClose)\n}\n\nfunc (w *writer) Reset(dstW io.Writer)\
+    \ {\n\tw.xw.Reset()\n\tw.do(opReset) //nolint:errcheck\n\tw.dstW = dstW\n}\n\n\
+    func (w *writer) do(op op) error {\n\tw.op = op\n\tif !stacklessWriterFunc(w)\
+    \ {\n\t\treturn errHighLoad\n\t}\n\terr := w.err\n\tif err != nil {\n\t\treturn\
+    \ err\n\t}\n\tif w.xw.bb != nil && len(w.xw.bb.B) > 0 {\n\t\t_, err = w.dstW.Write(w.xw.bb.B)\n\
+    \t}\n\tw.xw.Reset()\n\n\treturn err\n}\n\nvar errHighLoad = errors.New(\"cannot\
+    \ compress data due to high load\")\n\nvar (\n\tstacklessWriterFuncOnce sync.Once\n\
+    \tstacklessWriterFuncFunc func(ctx any) bool\n)\n\nfunc stacklessWriterFunc(ctx\
+    \ any) bool {\n\tstacklessWriterFuncOnce.Do(func() {\n\t\tstacklessWriterFuncFunc\
+    \ = NewFunc(writerFunc)\n\t})\n\treturn stacklessWriterFuncFunc(ctx)\n}\n\nfunc\
+    \ writerFunc(ctx any) {\n\tw := ctx.(*writer)\n\tswitch w.op {\n\tcase opWrite:\n\
+    \t\tw.n, w.err = w.zw.Write(w.p)\n\tcase opFlush:\n\t\tw.err = w.zw.Flush()\n\t\
+    case opClose:\n\t\tw.err = w.zw.Close()\n\tcase opReset:\n\t\tw.zw.Reset(&w.xw)\n\
+    \t\tw.err = nil\n\tdefault:\n\t\tpanic(fmt.Sprintf(\"BUG: unexpected op: %d\"\
+    , w.op))\n\t}\n}\n\ntype xWriter struct {\n\tbb *bytebufferpool.ByteBuffer\n}\n\
+    \nfunc (w *xWriter) Write(p []byte) (int, error) {\n\tif w.bb == nil {\n\t\tw.bb\
+    \ = bufferPool.Get()\n\t}\n\treturn w.bb.Write(p)\n}\n\nfunc (w *xWriter) Reset()\
+    \ {\n\tif w.bb != nil {\n\t\tbufferPool.Put(w.bb)\n\t\tw.bb = nil\n\t}\n}\n\n\
+    var bufferPool bytebufferpool.Pool\n\nOutput the complete test file, code only,\
+    \ no explanations.\n### Time\nCurrent time: 2025-03-23 23:29:02\n"
+  role: user

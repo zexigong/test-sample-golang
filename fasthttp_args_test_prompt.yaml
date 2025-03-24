@@ -1,0 +1,206 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: fasthttp\nTest File Path: fasthttp\\args_test.go\\\
+    args_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: fasthttp\\args_test.go\\source_files\\\
+    args.go\npackage fasthttp\n\nimport (\n\t\"bytes\"\n\t\"errors\"\n\t\"io\"\n\t\
+    \"sort\"\n\t\"sync\"\n)\n\nconst (\n\targsNoValue  = true\n\targsHasValue = false\n\
+    )\n\n// AcquireArgs returns an empty Args object from the pool.\n//\n// The returned\
+    \ Args may be returned to the pool with ReleaseArgs\n// when no longer needed.\
+    \ This allows reducing GC load.\nfunc AcquireArgs() *Args {\n\treturn argsPool.Get().(*Args)\n\
+    }\n\n// ReleaseArgs returns the object acquired via AcquireArgs to the pool.\n\
+    //\n// Do not access the released Args object, otherwise data races may occur.\n\
+    func ReleaseArgs(a *Args) {\n\ta.Reset()\n\targsPool.Put(a)\n}\n\nvar argsPool\
+    \ = &sync.Pool{\n\tNew: func() any {\n\t\treturn &Args{}\n\t},\n}\n\n// Args represents\
+    \ query arguments.\n//\n// It is forbidden copying Args instances. Create new\
+    \ instances instead\n// and use CopyTo().\n//\n// Args instance MUST NOT be used\
+    \ from concurrently running goroutines.\ntype Args struct {\n\tnoCopy noCopy\n\
+    \n\targs []argsKV\n\tbuf  []byte\n}\n\ntype argsKV struct {\n\tkey     []byte\n\
+    \tvalue   []byte\n\tnoValue bool\n}\n\n// Reset clears query args.\nfunc (a *Args)\
+    \ Reset() {\n\ta.args = a.args[:0]\n}\n\n// CopyTo copies all args to dst.\nfunc\
+    \ (a *Args) CopyTo(dst *Args) {\n\tdst.args = copyArgs(dst.args, a.args)\n}\n\n\
+    // VisitAll calls f for each existing arg.\n//\n// f must not retain references\
+    \ to key and value after returning.\n// Make key and/or value copies if you need\
+    \ storing them after returning.\nfunc (a *Args) VisitAll(f func(key, value []byte))\
+    \ {\n\tvisitArgs(a.args, f)\n}\n\n// Len returns the number of query args.\nfunc\
+    \ (a *Args) Len() int {\n\treturn len(a.args)\n}\n\n// Parse parses the given\
+    \ string containing query args.\nfunc (a *Args) Parse(s string) {\n\ta.buf = append(a.buf[:0],\
+    \ s...)\n\ta.ParseBytes(a.buf)\n}\n\n// ParseBytes parses the given b containing\
+    \ query args.\nfunc (a *Args) ParseBytes(b []byte) {\n\ta.Reset()\n\n\tvar s argsScanner\n\
+    \ts.b = b\n\n\tvar kv *argsKV\n\ta.args, kv = allocArg(a.args)\n\tfor s.next(kv)\
+    \ {\n\t\tif len(kv.key) > 0 || len(kv.value) > 0 {\n\t\t\ta.args, kv = allocArg(a.args)\n\
+    \t\t}\n\t}\n\ta.args = releaseArg(a.args)\n}\n\n// String returns string representation\
+    \ of query args.\nfunc (a *Args) String() string {\n\treturn string(a.QueryString())\n\
+    }\n\n// QueryString returns query string for the args.\n//\n// The returned value\
+    \ is valid until the Args is reused or released (ReleaseArgs).\n// Do not store\
+    \ references to the returned value. Make copies instead.\nfunc (a *Args) QueryString()\
+    \ []byte {\n\ta.buf = a.AppendBytes(a.buf[:0])\n\treturn a.buf\n}\n\n// Sort sorts\
+    \ Args by key and then value using 'f' as comparison function.\n//\n// For example\
+    \ args.Sort(bytes.Compare).\nfunc (a *Args) Sort(f func(x, y []byte) int) {\n\t\
+    sort.SliceStable(a.args, func(i, j int) bool {\n\t\tn := f(a.args[i].key, a.args[j].key)\n\
+    \t\tif n == 0 {\n\t\t\treturn f(a.args[i].value, a.args[j].value) == -1\n\t\t\
+    }\n\t\treturn n == -1\n\t})\n}\n\n// AppendBytes appends query string to dst and\
+    \ returns the extended dst.\nfunc (a *Args) AppendBytes(dst []byte) []byte {\n\
+    \tfor i, n := 0, len(a.args); i < n; i++ {\n\t\tkv := &a.args[i]\n\t\tdst = AppendQuotedArg(dst,\
+    \ kv.key)\n\t\tif !kv.noValue {\n\t\t\tdst = append(dst, '=')\n\t\t\tif len(kv.value)\
+    \ > 0 {\n\t\t\t\tdst = AppendQuotedArg(dst, kv.value)\n\t\t\t}\n\t\t}\n\t\tif\
+    \ i+1 < n {\n\t\t\tdst = append(dst, '&')\n\t\t}\n\t}\n\treturn dst\n}\n\n// WriteTo\
+    \ writes query string to w.\n//\n// WriteTo implements io.WriterTo interface.\n\
+    func (a *Args) WriteTo(w io.Writer) (int64, error) {\n\tn, err := w.Write(a.QueryString())\n\
+    \treturn int64(n), err\n}\n\n// Del deletes argument with the given key from query\
+    \ args.\nfunc (a *Args) Del(key string) {\n\ta.args = delAllArgs(a.args, key)\n\
+    }\n\n// DelBytes deletes argument with the given key from query args.\nfunc (a\
+    \ *Args) DelBytes(key []byte) {\n\ta.args = delAllArgs(a.args, b2s(key))\n}\n\n\
+    // Add adds 'key=value' argument.\n//\n// Multiple values for the same key may\
+    \ be added.\nfunc (a *Args) Add(key, value string) {\n\ta.args = appendArg(a.args,\
+    \ key, value, argsHasValue)\n}\n\n// AddBytesK adds 'key=value' argument.\n//\n\
+    // Multiple values for the same key may be added.\nfunc (a *Args) AddBytesK(key\
+    \ []byte, value string) {\n\ta.args = appendArg(a.args, b2s(key), value, argsHasValue)\n\
+    }\n\n// AddBytesV adds 'key=value' argument.\n//\n// Multiple values for the same\
+    \ key may be added.\nfunc (a *Args) AddBytesV(key string, value []byte) {\n\t\
+    a.args = appendArg(a.args, key, b2s(value), argsHasValue)\n}\n\n// AddBytesKV\
+    \ adds 'key=value' argument.\n//\n// Multiple values for the same key may be added.\n\
+    func (a *Args) AddBytesKV(key, value []byte) {\n\ta.args = appendArg(a.args, b2s(key),\
+    \ b2s(value), argsHasValue)\n}\n\n// AddNoValue adds only 'key' as argument without\
+    \ the '='.\n//\n// Multiple values for the same key may be added.\nfunc (a *Args)\
+    \ AddNoValue(key string) {\n\ta.args = appendArg(a.args, key, \"\", argsNoValue)\n\
+    }\n\n// AddBytesKNoValue adds only 'key' as argument without the '='.\n//\n//\
+    \ Multiple values for the same key may be added.\nfunc (a *Args) AddBytesKNoValue(key\
+    \ []byte) {\n\ta.args = appendArg(a.args, b2s(key), \"\", argsNoValue)\n}\n\n\
+    // Set sets 'key=value' argument.\nfunc (a *Args) Set(key, value string) {\n\t\
+    a.args = setArg(a.args, key, value, argsHasValue)\n}\n\n// SetBytesK sets 'key=value'\
+    \ argument.\nfunc (a *Args) SetBytesK(key []byte, value string) {\n\ta.args =\
+    \ setArg(a.args, b2s(key), value, argsHasValue)\n}\n\n// SetBytesV sets 'key=value'\
+    \ argument.\nfunc (a *Args) SetBytesV(key string, value []byte) {\n\ta.args =\
+    \ setArg(a.args, key, b2s(value), argsHasValue)\n}\n\n// SetBytesKV sets 'key=value'\
+    \ argument.\nfunc (a *Args) SetBytesKV(key, value []byte) {\n\ta.args = setArgBytes(a.args,\
+    \ key, value, argsHasValue)\n}\n\n// SetNoValue sets only 'key' as argument without\
+    \ the '='.\n//\n// Only key in argument, like key1&key2.\nfunc (a *Args) SetNoValue(key\
+    \ string) {\n\ta.args = setArg(a.args, key, \"\", argsNoValue)\n}\n\n// SetBytesKNoValue\
+    \ sets 'key' argument.\nfunc (a *Args) SetBytesKNoValue(key []byte) {\n\ta.args\
+    \ = setArg(a.args, b2s(key), \"\", argsNoValue)\n}\n\n// Peek returns query arg\
+    \ value for the given key.\n//\n// The returned value is valid until the Args\
+    \ is reused or released (ReleaseArgs).\n// Do not store references to the returned\
+    \ value. Make copies instead.\nfunc (a *Args) Peek(key string) []byte {\n\treturn\
+    \ peekArgStr(a.args, key)\n}\n\n// PeekBytes returns query arg value for the given\
+    \ key.\n//\n// The returned value is valid until the Args is reused or released\
+    \ (ReleaseArgs).\n// Do not store references to the returned value. Make copies\
+    \ instead.\nfunc (a *Args) PeekBytes(key []byte) []byte {\n\treturn peekArgBytes(a.args,\
+    \ key)\n}\n\n// PeekMulti returns all the arg values for the given key.\nfunc\
+    \ (a *Args) PeekMulti(key string) [][]byte {\n\tvar values [][]byte\n\ta.VisitAll(func(k,\
+    \ v []byte) {\n\t\tif string(k) == key {\n\t\t\tvalues = append(values, v)\n\t\
+    \t}\n\t})\n\treturn values\n}\n\n// PeekMultiBytes returns all the arg values\
+    \ for the given key.\nfunc (a *Args) PeekMultiBytes(key []byte) [][]byte {\n\t\
+    return a.PeekMulti(b2s(key))\n}\n\n// Has returns true if the given key exists\
+    \ in Args.\nfunc (a *Args) Has(key string) bool {\n\treturn hasArg(a.args, key)\n\
+    }\n\n// HasBytes returns true if the given key exists in Args.\nfunc (a *Args)\
+    \ HasBytes(key []byte) bool {\n\treturn hasArg(a.args, b2s(key))\n}\n\n// ErrNoArgValue\
+    \ is returned when Args value with the given key is missing.\nvar ErrNoArgValue\
+    \ = errors.New(\"no Args value for the given key\")\n\n// GetUint returns uint\
+    \ value for the given key.\nfunc (a *Args) GetUint(key string) (int, error) {\n\
+    \tvalue := a.Peek(key)\n\tif len(value) == 0 {\n\t\treturn -1, ErrNoArgValue\n\
+    \t}\n\treturn ParseUint(value)\n}\n\n// SetUint sets uint value for the given\
+    \ key.\nfunc (a *Args) SetUint(key string, value int) {\n\ta.buf = AppendUint(a.buf[:0],\
+    \ value)\n\ta.SetBytesV(key, a.buf)\n}\n\n// SetUintBytes sets uint value for\
+    \ the given key.\nfunc (a *Args) SetUintBytes(key []byte, value int) {\n\ta.SetUint(b2s(key),\
+    \ value)\n}\n\n// GetUintOrZero returns uint value for the given key.\n//\n//\
+    \ Zero (0) is returned on error.\nfunc (a *Args) GetUintOrZero(key string) int\
+    \ {\n\tn, err := a.GetUint(key)\n\tif err != nil {\n\t\tn = 0\n\t}\n\treturn n\n\
+    }\n\n// GetUfloat returns ufloat value for the given key.\nfunc (a *Args) GetUfloat(key\
+    \ string) (float64, error) {\n\tvalue := a.Peek(key)\n\tif len(value) == 0 {\n\
+    \t\treturn -1, ErrNoArgValue\n\t}\n\treturn ParseUfloat(value)\n}\n\n// GetUfloatOrZero\
+    \ returns ufloat value for the given key.\n//\n// Zero (0) is returned on error.\n\
+    func (a *Args) GetUfloatOrZero(key string) float64 {\n\tf, err := a.GetUfloat(key)\n\
+    \tif err != nil {\n\t\tf = 0\n\t}\n\treturn f\n}\n\n// GetBool returns boolean\
+    \ value for the given key.\n//\n// true is returned for \"1\", \"t\", \"T\", \"\
+    true\", \"TRUE\", \"True\", \"y\", \"yes\", \"Y\", \"YES\", \"Yes\",\n// otherwise\
+    \ false is returned.\nfunc (a *Args) GetBool(key string) bool {\n\tswitch string(a.Peek(key))\
+    \ {\n\t// Support the same true cases as strconv.ParseBool\n\t// See: https://github.com/golang/go/blob/4e1b11e2c9bdb0ddea1141eed487be1a626ff5be/src/strconv/atob.go#L12\n\
+    \t// and Y and Yes versions.\n\tcase \"1\", \"t\", \"T\", \"true\", \"TRUE\",\
+    \ \"True\", \"y\", \"yes\", \"Y\", \"YES\", \"Yes\":\n\t\treturn true\n\tdefault:\n\
+    \t\treturn false\n\t}\n}\n\nfunc visitArgs(args []argsKV, f func(k, v []byte))\
+    \ {\n\tfor i, n := 0, len(args); i < n; i++ {\n\t\tkv := &args[i]\n\t\tf(kv.key,\
+    \ kv.value)\n\t}\n}\n\nfunc copyArgs(dst, src []argsKV) []argsKV {\n\tif cap(dst)\
+    \ < len(src) {\n\t\ttmp := make([]argsKV, len(src))\n\t\tdstLen := len(dst)\n\t\
+    \tdst = dst[:cap(dst)] // copy all of dst.\n\t\tcopy(tmp, dst)\n\t\tfor i := dstLen;\
+    \ i < len(tmp); i++ {\n\t\t\t// Make sure nothing is nil.\n\t\t\ttmp[i].key =\
+    \ []byte{}\n\t\t\ttmp[i].value = []byte{}\n\t\t}\n\t\tdst = tmp\n\t}\n\tn := len(src)\n\
+    \tdst = dst[:n]\n\tfor i := 0; i < n; i++ {\n\t\tdstKV := &dst[i]\n\t\tsrcKV :=\
+    \ &src[i]\n\t\tdstKV.key = append(dstKV.key[:0], srcKV.key...)\n\t\tif srcKV.noValue\
+    \ {\n\t\t\tdstKV.value = dstKV.value[:0]\n\t\t} else {\n\t\t\tdstKV.value = append(dstKV.value[:0],\
+    \ srcKV.value...)\n\t\t}\n\t\tdstKV.noValue = srcKV.noValue\n\t}\n\treturn dst\n\
+    }\n\nfunc delAllArgsBytes(args []argsKV, key []byte) []argsKV {\n\treturn delAllArgs(args,\
+    \ b2s(key))\n}\n\nfunc delAllArgs(args []argsKV, key string) []argsKV {\n\tfor\
+    \ i, n := 0, len(args); i < n; i++ {\n\t\tkv := &args[i]\n\t\tif key == string(kv.key)\
+    \ {\n\t\t\ttmp := *kv\n\t\t\tcopy(args[i:], args[i+1:])\n\t\t\tn--\n\t\t\ti--\n\
+    \t\t\targs[n] = tmp\n\t\t\targs = args[:n]\n\t\t}\n\t}\n\treturn args\n}\n\nfunc\
+    \ setArgBytes(h []argsKV, key, value []byte, noValue bool) []argsKV {\n\treturn\
+    \ setArg(h, b2s(key), b2s(value), noValue)\n}\n\nfunc setArg(h []argsKV, key,\
+    \ value string, noValue bool) []argsKV {\n\tn := len(h)\n\tfor i := 0; i < n;\
+    \ i++ {\n\t\tkv := &h[i]\n\t\tif key == string(kv.key) {\n\t\t\tif noValue {\n\
+    \t\t\t\tkv.value = kv.value[:0]\n\t\t\t} else {\n\t\t\t\tkv.value = append(kv.value[:0],\
+    \ value...)\n\t\t\t}\n\t\t\tkv.noValue = noValue\n\t\t\treturn h\n\t\t}\n\t}\n\
+    \treturn appendArg(h, key, value, noValue)\n}\n\nfunc appendArgBytes(h []argsKV,\
+    \ key, value []byte, noValue bool) []argsKV {\n\treturn appendArg(h, b2s(key),\
+    \ b2s(value), noValue)\n}\n\nfunc appendArg(args []argsKV, key, value string,\
+    \ noValue bool) []argsKV {\n\tvar kv *argsKV\n\targs, kv = allocArg(args)\n\t\
+    kv.key = append(kv.key[:0], key...)\n\tif noValue {\n\t\tkv.value = kv.value[:0]\n\
+    \t} else {\n\t\tkv.value = append(kv.value[:0], value...)\n\t}\n\tkv.noValue =\
+    \ noValue\n\treturn args\n}\n\nfunc allocArg(h []argsKV) ([]argsKV, *argsKV) {\n\
+    \tn := len(h)\n\tif cap(h) > n {\n\t\th = h[:n+1]\n\t} else {\n\t\th = append(h,\
+    \ argsKV{\n\t\t\tvalue: []byte{},\n\t\t})\n\t}\n\treturn h, &h[n]\n}\n\nfunc releaseArg(h\
+    \ []argsKV) []argsKV {\n\treturn h[:len(h)-1]\n}\n\nfunc hasArg(h []argsKV, key\
+    \ string) bool {\n\tfor i, n := 0, len(h); i < n; i++ {\n\t\tkv := &h[i]\n\t\t\
+    if key == string(kv.key) {\n\t\t\treturn true\n\t\t}\n\t}\n\treturn false\n}\n\
+    \nfunc peekArgBytes(h []argsKV, k []byte) []byte {\n\tfor i, n := 0, len(h); i\
+    \ < n; i++ {\n\t\tkv := &h[i]\n\t\tif bytes.Equal(kv.key, k) {\n\t\t\treturn kv.value\n\
+    \t\t}\n\t}\n\treturn nil\n}\n\nfunc peekArgStr(h []argsKV, k string) []byte {\n\
+    \tfor i, n := 0, len(h); i < n; i++ {\n\t\tkv := &h[i]\n\t\tif string(kv.key)\
+    \ == k {\n\t\t\treturn kv.value\n\t\t}\n\t}\n\treturn nil\n}\n\ntype argsScanner\
+    \ struct {\n\tb []byte\n}\n\nfunc (s *argsScanner) next(kv *argsKV) bool {\n\t\
+    if len(s.b) == 0 {\n\t\treturn false\n\t}\n\tkv.noValue = argsHasValue\n\n\tisKey\
+    \ := true\n\tk := 0\n\tfor i, c := range s.b {\n\t\tswitch c {\n\t\tcase '=':\n\
+    \t\t\tif isKey {\n\t\t\t\tisKey = false\n\t\t\t\tkv.key = decodeArgAppend(kv.key[:0],\
+    \ s.b[:i])\n\t\t\t\tk = i + 1\n\t\t\t}\n\t\tcase '&':\n\t\t\tif isKey {\n\t\t\t\
+    \tkv.key = decodeArgAppend(kv.key[:0], s.b[:i])\n\t\t\t\tkv.value = kv.value[:0]\n\
+    \t\t\t\tkv.noValue = argsNoValue\n\t\t\t} else {\n\t\t\t\tkv.value = decodeArgAppend(kv.value[:0],\
+    \ s.b[k:i])\n\t\t\t}\n\t\t\ts.b = s.b[i+1:]\n\t\t\treturn true\n\t\t}\n\t}\n\n\
+    \tif isKey {\n\t\tkv.key = decodeArgAppend(kv.key[:0], s.b)\n\t\tkv.value = kv.value[:0]\n\
+    \t\tkv.noValue = argsNoValue\n\t} else {\n\t\tkv.value = decodeArgAppend(kv.value[:0],\
+    \ s.b[k:])\n\t}\n\ts.b = s.b[len(s.b):]\n\treturn true\n}\n\nfunc decodeArgAppend(dst,\
+    \ src []byte) []byte {\n\tidxPercent := bytes.IndexByte(src, '%')\n\tidxPlus :=\
+    \ bytes.IndexByte(src, '+')\n\tif idxPercent == -1 && idxPlus == -1 {\n\t\t//\
+    \ fast path: src doesn't contain encoded chars\n\t\treturn append(dst, src...)\n\
+    \t}\n\n\tvar idx int\n\tswitch {\n\tcase idxPercent == -1:\n\t\tidx = idxPlus\n\
+    \tcase idxPlus == -1:\n\t\tidx = idxPercent\n\tcase idxPercent > idxPlus:\n\t\t\
+    idx = idxPlus\n\tdefault:\n\t\tidx = idxPercent\n\t}\n\n\tdst = append(dst, src[:idx]...)\n\
+    \n\t// slow path\n\tfor i := idx; i < len(src); i++ {\n\t\tc := src[i]\n\t\tswitch\
+    \ c {\n\t\tcase '%':\n\t\t\tif i+2 >= len(src) {\n\t\t\t\treturn append(dst, src[i:]...)\n\
+    \t\t\t}\n\t\t\tx2 := hex2intTable[src[i+2]]\n\t\t\tx1 := hex2intTable[src[i+1]]\n\
+    \t\t\tif x1 == 16 || x2 == 16 {\n\t\t\t\tdst = append(dst, '%')\n\t\t\t} else\
+    \ {\n\t\t\t\tdst = append(dst, x1<<4|x2)\n\t\t\t\ti += 2\n\t\t\t}\n\t\tcase '+':\n\
+    \t\t\tdst = append(dst, ' ')\n\t\tdefault:\n\t\t\tdst = append(dst, c)\n\t\t}\n\
+    \t}\n\treturn dst\n}\n\n// decodeArgAppendNoPlus is almost identical to decodeArgAppend,\
+    \ but it doesn't\n// substitute '+' with ' '.\n//\n// The function is copy-pasted\
+    \ from decodeArgAppend due to the performance\n// reasons only.\nfunc decodeArgAppendNoPlus(dst,\
+    \ src []byte) []byte {\n\tidx := bytes.IndexByte(src, '%')\n\tif idx < 0 {\n\t\
+    \t// fast path: src doesn't contain encoded chars\n\t\treturn append(dst, src...)\n\
+    \t}\n\tdst = append(dst, src[:idx]...)\n\n\t// slow path\n\tfor i := idx; i <\
+    \ len(src); i++ {\n\t\tc := src[i]\n\t\tif c == '%' {\n\t\t\tif i+2 >= len(src)\
+    \ {\n\t\t\t\treturn append(dst, src[i:]...)\n\t\t\t}\n\t\t\tx2 := hex2intTable[src[i+2]]\n\
+    \t\t\tx1 := hex2intTable[src[i+1]]\n\t\t\tif x1 == 16 || x2 == 16 {\n\t\t\t\t\
+    dst = append(dst, '%')\n\t\t\t} else {\n\t\t\t\tdst = append(dst, x1<<4|x2)\n\t\
+    \t\t\ti += 2\n\t\t\t}\n\t\t} else {\n\t\t\tdst = append(dst, c)\n\t\t}\n\t}\n\t\
+    return dst\n}\n\nfunc peekAllArgBytesToDst(dst [][]byte, h []argsKV, k []byte)\
+    \ [][]byte {\n\tfor i, n := 0, len(h); i < n; i++ {\n\t\tkv := &h[i]\n\t\tif bytes.Equal(kv.key,\
+    \ k) {\n\t\t\tdst = append(dst, kv.value)\n\t\t}\n\t}\n\treturn dst\n}\n\nfunc\
+    \ peekArgsKeys(dst [][]byte, h []argsKV) [][]byte {\n\tfor i, n := 0, len(h);\
+    \ i < n; i++ {\n\t\tkv := &h[i]\n\t\tdst = append(dst, kv.key)\n\t}\n\treturn\
+    \ dst\n}\n\n### Source File Dependency Files Content\n### Dependency File: empty.go\n\
+    \nOutput the complete test file, code only, no explanations.\n### Time\nCurrent\
+    \ time: 2025-03-23 23:28:07\n"
+  role: user

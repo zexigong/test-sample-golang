@@ -4,41 +4,41 @@ import argparse
 import os
 
 
-def find_files(repo_path: str):
+def find_go_files(repo_path):
     """
-    Automatically finds test, source, and dependency files based on the given repository structure.
-    Matches each test file with its corresponding source and dependency files.
+    Automatically finds Go source, test, and dependency files.
+    Group test files with their source files and dependencies.
     """
     test_source_map = {}
 
-    # Walk through the repo and find files
     for root, _, files in os.walk(repo_path):
         for file in files:
-            file_path = os.path.join(root, file)
+            if file.endswith("_test.go"):
+                test_path = os.path.join(root, file)
 
-            # Identify test files (inside any "test_*" folder)
-            if "test_" in os.path.basename(root):
-                test_folder = root
-                test_file = file_path
+                # Check parent directory for "source_files" and "dependent_files"
+                test_dir = os.path.dirname(test_path)
+                source_dir = os.path.join(test_dir, "source_files")
+                dependent_dir = os.path.join(test_dir, "dependent_files")
 
-                # Locate corresponding source and dependency folders
-                source_folder = os.path.join(test_folder, "source_files")
-                dependent_folder = os.path.join(test_folder, "dependent_files")
+                # If not found, fallback to test file's directory
+                if not os.path.exists(source_dir):
+                    source_dir = test_dir
+                if not os.path.exists(dependent_dir):
+                    dependent_dir = test_dir
 
-                # Find source files
+                # Collect source and dependency .go files
                 source_files = [
-                    os.path.join(source_folder, f) for f in os.listdir(source_folder)
-                    if f.endswith(".py")
-                ] if os.path.exists(source_folder) else []
+                    os.path.join(source_dir, f) for f in os.listdir(source_dir)
+                    if f.endswith(".go") and not f.endswith("_test.go")
+                ]
 
-                # Find dependency files (or use empty.txt if none found)
                 dependency_files = [
-                    os.path.join(dependent_folder, f) for f in os.listdir(dependent_folder)
-                    if f.endswith(".py")
-                ] if os.path.exists(dependent_folder) else ["empty.txt"]
+                    os.path.join(dependent_dir, f) for f in os.listdir(dependent_dir)
+                    if f.endswith(".go") and not f.endswith("_test.go")
+                ] or ["empty.go"]
 
-                # Store in the mapping
-                test_source_map[test_file] = {
+                test_source_map[test_path] = {
                     "sources": source_files,
                     "dependencies": dependency_files
                 }
@@ -47,13 +47,10 @@ def find_files(repo_path: str):
 
 
 def read_files(file_paths):
-    """
-    Reads and returns content from multiple files.
-    """
     contents = []
     for path in file_paths:
-        if path == "empty.txt":
-            contents.append("")  # Empty string for missing dependencies
+        if path == "empty.go":
+            contents.append("")
         else:
             with open(path, "r", encoding="utf-8") as f:
                 contents.append(f.read())
@@ -61,16 +58,14 @@ def read_files(file_paths):
 
 
 def generate_messages(repository: str,
-                      source_file_contents: list,
+                      source_file_paths: list,
+                      dependencies_file_paths: list,
                       test_file_path: str,
                       language: str,
                       framework: str,
-                      dependencies_file_names: list,
+                      source_file_contents: list,
                       dependencies_file_contents: list,
                       test_example_content: str) -> dict:
-    """
-    Generate a JSON object in conversation format for fine-tuning.
-    """
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     system_message = (
@@ -79,84 +74,73 @@ def generate_messages(repository: str,
         "Make sure the tests can be executed without lint or compile errors."
     )
 
-    # Combine multiple source files
     source_content = "\n\n".join(
-        [f"### Source File Content:\n{content}" for content in source_file_contents]
+        [f"### Source File: {path}\n{content}" for path, content in zip(source_file_paths, source_file_contents)]
     )
 
-    # Combine dependencies using file names
     dependencies_content = "\n\n".join(
-        [f"### Dependency File: {os.path.basename(name)}\n{content}" for name, content in zip(dependencies_file_names, dependencies_file_contents)]
+        [f"### Dependency File: {path}\n{content}" for path, content in zip(dependencies_file_paths, dependencies_file_contents)]
     )
 
     user_message = (
         "### Task Information\n"
         "Based on the source code, write/rewrite tests to cover the source code.\n"
         f"Repository: {repository}\n"
+        f"Source File Path(s): {source_file_paths}\n"
         f"Test File Path: {test_file_path}\n"
-        f"Project Programming Language: {language}\n"
+        f"Programming Language: {language}\n"
         f"Testing Framework: {framework}\n"
-        "### Source File Content\n"
         f"{source_content}\n"
-        "### Source File Dependency Files Content\n"
+        f"### Source File Dependency Files Content\n"
         f"{dependencies_content}\n"
         "Output the complete test file, code only, no explanations.\n"
-        f"```{language}\n<complete test code>\n```\n"
         "### Time\n"
         f"Current time: {current_time}"
     )
 
-    # Format the assistant message to include the test example within a go code block
     assistant_message = f"```go\n{test_example_content}\n```"
 
     messages = [
         {"role": "system", "content": system_message},
         {"role": "user", "content": user_message},
-        {"role": "assistant", "content": assistant_message}
+        # {"role": "assistant", "content": assistant_message}
     ]
     return {"messages": messages}
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Auto-scan repo and generate fine-tuning JSONL document"
-    )
-    parser.add_argument("--repository", type=str, required=True, help="Repository name or path")
-    parser.add_argument("--repo_path", type=str, required=True, help="Path to the repository directory")
-    parser.add_argument("--language", type=str, required=True, help="Programming language")
-    parser.add_argument("--framework", type=str, required=True, help="Testing framework")
-    parser.add_argument("--output", type=str, default="fine_tuning.jsonl", help="Output JSONL file")
+    parser = argparse.ArgumentParser(description="Generate fine-tuning JSONL for Go project")
+    parser.add_argument("--repository", type=str, required=True, help="Repository name")
+    parser.add_argument("--repo_path", type=str, required=True, help="Path to the repo")
+    parser.add_argument("--language", type=str, default="Go", help="Programming language")
+    parser.add_argument("--framework", type=str, default="go testing", help="Testing framework")
+    parser.add_argument("--output", type=str, default="fine_tuning_go.jsonl", help="Output JSONL file")
 
     args = parser.parse_args()
+    test_source_map = find_go_files(args.repo_path)
 
-    # Auto-map test files to corresponding source and dependency files
-    test_source_map = find_files(args.repo_path)
+    for test_file, mapping in test_source_map.items():
+        source_files = mapping["sources"]
+        dependencies = mapping["dependencies"]
 
-    # Process each test file separately
-    for test_file, file_mappings in test_source_map.items():
-        related_sources = file_mappings["sources"]
-        related_dependencies = file_mappings["dependencies"]
+        source_contents = read_files(source_files)
+        dependency_contents = read_files(dependencies)
 
-        # Read content of source and dependency files
-        source_file_contents = read_files(related_sources)
-        dependencies_file_contents = read_files(related_dependencies)
-
-        # Read test file content
-        with open(test_file, "r", encoding="utf-8") as te:
-            test_example_content = te.read()
+        with open(test_file, "r", encoding="utf-8") as f:
+            test_example_content = f.read()
 
         conversation = generate_messages(
             repository=args.repository,
-            source_file_contents=source_file_contents,
+            source_file_paths=source_files,
+            dependencies_file_paths=dependencies,
             test_file_path=test_file,
             language=args.language,
             framework=args.framework,
-            dependencies_file_names=related_dependencies,
-            dependencies_file_contents=dependencies_file_contents,
+            source_file_contents=source_contents,
+            dependencies_file_contents=dependency_contents,
             test_example_content=test_example_content
         )
 
-        # Append to the JSONL file
         with open(args.output, "a", encoding="utf-8") as out_file:
             out_file.write(json.dumps(conversation) + "\n")
 

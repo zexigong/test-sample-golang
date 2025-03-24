@@ -1,0 +1,163 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: chi\nTest File Path: chi\\compress_test.go\\\
+    compress_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: chi\\compress_test.go\\source_files\\\
+    compress.go\npackage middleware\n\nimport (\n\t\"bufio\"\n\t\"compress/flate\"\
+    \n\t\"compress/gzip\"\n\t\"errors\"\n\t\"fmt\"\n\t\"io\"\n\t\"net\"\n\t\"net/http\"\
+    \n\t\"strings\"\n\t\"sync\"\n)\n\nvar defaultCompressibleContentTypes = []string{\n\
+    \t\"text/html\",\n\t\"text/css\",\n\t\"text/plain\",\n\t\"text/javascript\",\n\
+    \t\"application/javascript\",\n\t\"application/x-javascript\",\n\t\"application/json\"\
+    ,\n\t\"application/atom+xml\",\n\t\"application/rss+xml\",\n\t\"image/svg+xml\"\
+    ,\n}\n\n// Compress is a middleware that compresses response\n// body of a given\
+    \ content types to a data format based\n// on Accept-Encoding request header.\
+    \ It uses a given\n// compression level.\n//\n// NOTE: make sure to set the Content-Type\
+    \ header on your response\n// otherwise this middleware will not compress the\
+    \ response body. For ex, in\n// your handler you should set w.Header().Set(\"\
+    Content-Type\", http.DetectContentType(yourBody))\n// or set it manually.\n//\n\
+    // Passing a compression level of 5 is sensible value\nfunc Compress(level int,\
+    \ types ...string) func(next http.Handler) http.Handler {\n\tcompressor := NewCompressor(level,\
+    \ types...)\n\treturn compressor.Handler\n}\n\n// Compressor represents a set\
+    \ of encoding configurations.\ntype Compressor struct {\n\t// The mapping of encoder\
+    \ names to encoder functions.\n\tencoders map[string]EncoderFunc\n\t// The mapping\
+    \ of pooled encoders to pools.\n\tpooledEncoders map[string]*sync.Pool\n\t// The\
+    \ set of content types allowed to be compressed.\n\tallowedTypes     map[string]struct{}\n\
+    \tallowedWildcards map[string]struct{}\n\t// The list of encoders in order of\
+    \ decreasing precedence.\n\tencodingPrecedence []string\n\tlevel             \
+    \ int // The compression level.\n}\n\n// NewCompressor creates a new Compressor\
+    \ that will handle encoding responses.\n//\n// The level should be one of the\
+    \ ones defined in the flate package.\n// The types are the content types that\
+    \ are allowed to be compressed.\nfunc NewCompressor(level int, types ...string)\
+    \ *Compressor {\n\t// If types are provided, set those as the allowed types. If\
+    \ none are\n\t// provided, use the default list.\n\tallowedTypes := make(map[string]struct{})\n\
+    \tallowedWildcards := make(map[string]struct{})\n\tif len(types) > 0 {\n\t\tfor\
+    \ _, t := range types {\n\t\t\tif strings.Contains(strings.TrimSuffix(t, \"/*\"\
+    ), \"*\") {\n\t\t\t\tpanic(fmt.Sprintf(\"middleware/compress: Unsupported content-type\
+    \ wildcard pattern '%s'. Only '/*' supported\", t))\n\t\t\t}\n\t\t\tif strings.HasSuffix(t,\
+    \ \"/*\") {\n\t\t\t\tallowedWildcards[strings.TrimSuffix(t, \"/*\")] = struct{}{}\n\
+    \t\t\t} else {\n\t\t\t\tallowedTypes[t] = struct{}{}\n\t\t\t}\n\t\t}\n\t} else\
+    \ {\n\t\tfor _, t := range defaultCompressibleContentTypes {\n\t\t\tallowedTypes[t]\
+    \ = struct{}{}\n\t\t}\n\t}\n\n\tc := &Compressor{\n\t\tlevel:            level,\n\
+    \t\tencoders:         make(map[string]EncoderFunc),\n\t\tpooledEncoders:   make(map[string]*sync.Pool),\n\
+    \t\tallowedTypes:     allowedTypes,\n\t\tallowedWildcards: allowedWildcards,\n\
+    \t}\n\n\t// Set the default encoders.  The precedence order uses the reverse\n\
+    \t// ordering that the encoders were added. This means adding new encoders\n\t\
+    // will move them to the front of the order.\n\t//\n\t// TODO:\n\t// lzma: Opera.\n\
+    \t// sdch: Chrome, Android. Gzip output + dictionary header.\n\t// br:   Brotli,\
+    \ see https://github.com/go-chi/chi/pull/326\n\n\t// HTTP 1.1 \"deflate\" (RFC\
+    \ 2616) stands for DEFLATE data (RFC 1951)\n\t// wrapped with zlib (RFC 1950).\
+    \ The zlib wrapper uses Adler-32\n\t// checksum compared to CRC-32 used in \"\
+    gzip\" and thus is faster.\n\t//\n\t// But.. some old browsers (MSIE, Safari 5.1)\
+    \ incorrectly expect\n\t// raw DEFLATE data only, without the mentioned zlib wrapper.\n\
+    \t// Because of this major confusion, most modern browsers try it\n\t// both ways,\
+    \ first looking for zlib headers.\n\t// Quote by Mark Adler: http://stackoverflow.com/a/9186091/385548\n\
+    \t//\n\t// The list of browsers having problems is quite big, see:\n\t// http://zoompf.com/blog/2012/02/lose-the-wait-http-compression\n\
+    \t// https://web.archive.org/web/20120321182910/http://www.vervestudios.co/projects/compression-tests/results\n\
+    \t//\n\t// That's why we prefer gzip over deflate. It's just more reliable\n\t\
+    // and not significantly slower than deflate.\n\tc.SetEncoder(\"deflate\", encoderDeflate)\n\
+    \n\t// TODO: Exception for old MSIE browsers that can't handle non-HTML?\n\t//\
+    \ https://zoompf.com/blog/2012/02/lose-the-wait-http-compression\n\tc.SetEncoder(\"\
+    gzip\", encoderGzip)\n\n\t// NOTE: Not implemented, intentionally:\n\t// case\
+    \ \"compress\": // LZW. Deprecated.\n\t// case \"bzip2\":    // Too slow on-the-fly.\n\
+    \t// case \"zopfli\":   // Too slow on-the-fly.\n\t// case \"xz\":       // Too\
+    \ slow on-the-fly.\n\treturn c\n}\n\n// SetEncoder can be used to set the implementation\
+    \ of a compression algorithm.\n//\n// The encoding should be a standardised identifier.\
+    \ See:\n// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept-Encoding\n\
+    //\n// For example, add the Brotli algorithm:\n//\n//\timport brotli_enc \"gopkg.in/kothar/brotli-go.v0/enc\"\
+    \n//\n//\tcompressor := middleware.NewCompressor(5, \"text/html\")\n//\tcompressor.SetEncoder(\"\
+    br\", func(w io.Writer, level int) io.Writer {\n//\t\tparams := brotli_enc.NewBrotliParams()\n\
+    //\t\tparams.SetQuality(level)\n//\t\treturn brotli_enc.NewBrotliWriter(params,\
+    \ w)\n//\t})\nfunc (c *Compressor) SetEncoder(encoding string, fn EncoderFunc)\
+    \ {\n\tencoding = strings.ToLower(encoding)\n\tif encoding == \"\" {\n\t\tpanic(\"\
+    the encoding can not be empty\")\n\t}\n\tif fn == nil {\n\t\tpanic(\"attempted\
+    \ to set a nil encoder function\")\n\t}\n\n\t// If we are adding a new encoder\
+    \ that is already registered, we have to\n\t// clear that one out first.\n\tdelete(c.pooledEncoders,\
+    \ encoding)\n\tdelete(c.encoders, encoding)\n\n\t// If the encoder supports Resetting\
+    \ (IoReseterWriter), then it can be pooled.\n\tencoder := fn(io.Discard, c.level)\n\
+    \tif _, ok := encoder.(ioResetterWriter); ok {\n\t\tpool := &sync.Pool{\n\t\t\t\
+    New: func() interface{} {\n\t\t\t\treturn fn(io.Discard, c.level)\n\t\t\t},\n\t\
+    \t}\n\t\tc.pooledEncoders[encoding] = pool\n\t}\n\t// If the encoder is not in\
+    \ the pooledEncoders, add it to the normal encoders.\n\tif _, ok := c.pooledEncoders[encoding];\
+    \ !ok {\n\t\tc.encoders[encoding] = fn\n\t}\n\n\tfor i, v := range c.encodingPrecedence\
+    \ {\n\t\tif v == encoding {\n\t\t\tc.encodingPrecedence = append(c.encodingPrecedence[:i],\
+    \ c.encodingPrecedence[i+1:]...)\n\t\t}\n\t}\n\n\tc.encodingPrecedence = append([]string{encoding},\
+    \ c.encodingPrecedence...)\n}\n\n// Handler returns a new middleware that will\
+    \ compress the response based on the\n// current Compressor.\nfunc (c *Compressor)\
+    \ Handler(next http.Handler) http.Handler {\n\treturn http.HandlerFunc(func(w\
+    \ http.ResponseWriter, r *http.Request) {\n\t\tencoder, encoding, cleanup := c.selectEncoder(r.Header,\
+    \ w)\n\n\t\tcw := &compressResponseWriter{\n\t\t\tResponseWriter:   w,\n\t\t\t\
+    w:                w,\n\t\t\tcontentTypes:     c.allowedTypes,\n\t\t\tcontentWildcards:\
+    \ c.allowedWildcards,\n\t\t\tencoding:         encoding,\n\t\t\tcompressible:\
+    \     false, // determined in post-handler\n\t\t}\n\t\tif encoder != nil {\n\t\
+    \t\tcw.w = encoder\n\t\t}\n\t\t// Re-add the encoder to the pool if applicable.\n\
+    \t\tdefer cleanup()\n\t\tdefer cw.Close()\n\n\t\tnext.ServeHTTP(cw, r)\n\t})\n\
+    }\n\n// selectEncoder returns the encoder, the name of the encoder, and a closer\
+    \ function.\nfunc (c *Compressor) selectEncoder(h http.Header, w io.Writer) (io.Writer,\
+    \ string, func()) {\n\theader := h.Get(\"Accept-Encoding\")\n\n\t// Parse the\
+    \ names of all accepted algorithms from the header.\n\taccepted := strings.Split(strings.ToLower(header),\
+    \ \",\")\n\n\t// Find supported encoder by accepted list by precedence\n\tfor\
+    \ _, name := range c.encodingPrecedence {\n\t\tif matchAcceptEncoding(accepted,\
+    \ name) {\n\t\t\tif pool, ok := c.pooledEncoders[name]; ok {\n\t\t\t\tencoder\
+    \ := pool.Get().(ioResetterWriter)\n\t\t\t\tcleanup := func() {\n\t\t\t\t\tpool.Put(encoder)\n\
+    \t\t\t\t}\n\t\t\t\tencoder.Reset(w)\n\t\t\t\treturn encoder, name, cleanup\n\n\
+    \t\t\t}\n\t\t\tif fn, ok := c.encoders[name]; ok {\n\t\t\t\treturn fn(w, c.level),\
+    \ name, func() {}\n\t\t\t}\n\t\t}\n\n\t}\n\n\t// No encoder found to match the\
+    \ accepted encoding\n\treturn nil, \"\", func() {}\n}\n\nfunc matchAcceptEncoding(accepted\
+    \ []string, encoding string) bool {\n\tfor _, v := range accepted {\n\t\tif strings.Contains(v,\
+    \ encoding) {\n\t\t\treturn true\n\t\t}\n\t}\n\treturn false\n}\n\n// An EncoderFunc\
+    \ is a function that wraps the provided io.Writer with a\n// streaming compression\
+    \ algorithm and returns it.\n//\n// In case of failure, the function should return\
+    \ nil.\ntype EncoderFunc func(w io.Writer, level int) io.Writer\n\n// Interface\
+    \ for types that allow resetting io.Writers.\ntype ioResetterWriter interface\
+    \ {\n\tio.Writer\n\tReset(w io.Writer)\n}\n\ntype compressResponseWriter struct\
+    \ {\n\thttp.ResponseWriter\n\n\t// The streaming encoder writer to be used if\
+    \ there is one. Otherwise,\n\t// this is just the normal writer.\n\tw        \
+    \        io.Writer\n\tcontentTypes     map[string]struct{}\n\tcontentWildcards\
+    \ map[string]struct{}\n\tencoding         string\n\twroteHeader      bool\n\t\
+    compressible     bool\n}\n\nfunc (cw *compressResponseWriter) isCompressible()\
+    \ bool {\n\t// Parse the first part of the Content-Type response header.\n\tcontentType\
+    \ := cw.Header().Get(\"Content-Type\")\n\tcontentType, _, _ = strings.Cut(contentType,\
+    \ \";\")\n\n\t// Is the content type compressible?\n\tif _, ok := cw.contentTypes[contentType];\
+    \ ok {\n\t\treturn true\n\t}\n\tif contentType, _, hadSlash := strings.Cut(contentType,\
+    \ \"/\"); hadSlash {\n\t\t_, ok := cw.contentWildcards[contentType]\n\t\treturn\
+    \ ok\n\t}\n\treturn false\n}\n\nfunc (cw *compressResponseWriter) WriteHeader(code\
+    \ int) {\n\tif cw.wroteHeader {\n\t\tcw.ResponseWriter.WriteHeader(code) // Allow\
+    \ multiple calls to propagate.\n\t\treturn\n\t}\n\tcw.wroteHeader = true\n\tdefer\
+    \ cw.ResponseWriter.WriteHeader(code)\n\n\t// Already compressed data?\n\tif cw.Header().Get(\"\
+    Content-Encoding\") != \"\" {\n\t\treturn\n\t}\n\n\tif !cw.isCompressible() {\n\
+    \t\tcw.compressible = false\n\t\treturn\n\t}\n\n\tif cw.encoding != \"\" {\n\t\
+    \tcw.compressible = true\n\t\tcw.Header().Set(\"Content-Encoding\", cw.encoding)\n\
+    \t\tcw.Header().Add(\"Vary\", \"Accept-Encoding\")\n\n\t\t// The content-length\
+    \ after compression is unknown\n\t\tcw.Header().Del(\"Content-Length\")\n\t}\n\
+    }\n\nfunc (cw *compressResponseWriter) Write(p []byte) (int, error) {\n\tif !cw.wroteHeader\
+    \ {\n\t\tcw.WriteHeader(http.StatusOK)\n\t}\n\n\treturn cw.writer().Write(p)\n\
+    }\n\nfunc (cw *compressResponseWriter) writer() io.Writer {\n\tif cw.compressible\
+    \ {\n\t\treturn cw.w\n\t}\n\treturn cw.ResponseWriter\n}\n\ntype compressFlusher\
+    \ interface {\n\tFlush() error\n}\n\nfunc (cw *compressResponseWriter) Flush()\
+    \ {\n\tif f, ok := cw.writer().(http.Flusher); ok {\n\t\tf.Flush()\n\t}\n\t//\
+    \ If the underlying writer has a compression flush signature,\n\t// call this\
+    \ Flush() method instead\n\tif f, ok := cw.writer().(compressFlusher); ok {\n\t\
+    \tf.Flush()\n\n\t\t// Also flush the underlying response writer\n\t\tif f, ok\
+    \ := cw.ResponseWriter.(http.Flusher); ok {\n\t\t\tf.Flush()\n\t\t}\n\t}\n}\n\n\
+    func (cw *compressResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error)\
+    \ {\n\tif hj, ok := cw.writer().(http.Hijacker); ok {\n\t\treturn hj.Hijack()\n\
+    \t}\n\treturn nil, nil, errors.New(\"chi/middleware: http.Hijacker is unavailable\
+    \ on the writer\")\n}\n\nfunc (cw *compressResponseWriter) Push(target string,\
+    \ opts *http.PushOptions) error {\n\tif ps, ok := cw.writer().(http.Pusher); ok\
+    \ {\n\t\treturn ps.Push(target, opts)\n\t}\n\treturn errors.New(\"chi/middleware:\
+    \ http.Pusher is unavailable on the writer\")\n}\n\nfunc (cw *compressResponseWriter)\
+    \ Close() error {\n\tif c, ok := cw.writer().(io.WriteCloser); ok {\n\t\treturn\
+    \ c.Close()\n\t}\n\treturn errors.New(\"chi/middleware: io.WriteCloser is unavailable\
+    \ on the writer\")\n}\n\nfunc (cw *compressResponseWriter) Unwrap() http.ResponseWriter\
+    \ {\n\treturn cw.ResponseWriter\n}\n\nfunc encoderGzip(w io.Writer, level int)\
+    \ io.Writer {\n\tgw, err := gzip.NewWriterLevel(w, level)\n\tif err != nil {\n\
+    \t\treturn nil\n\t}\n\treturn gw\n}\n\nfunc encoderDeflate(w io.Writer, level\
+    \ int) io.Writer {\n\tdw, err := flate.NewWriter(w, level)\n\tif err != nil {\n\
+    \t\treturn nil\n\t}\n\treturn dw\n}\n\n### Source File Dependency Files Content\n\
+    ### Dependency File: empty.go\n\nOutput the complete test file, code only, no\
+    \ explanations.\n### Time\nCurrent time: 2025-03-23 22:46:18\n"
+  role: user

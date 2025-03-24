@@ -1,0 +1,35 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: fasthttp\nTest File Path: fasthttp\\userdata_test.go\\\
+    userdata_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: fasthttp\\userdata_test.go\\source_files\\\
+    userdata.go\npackage fasthttp\n\nimport (\n\t\"io\"\n)\n\ntype userDataKV struct\
+    \ {\n\tkey   any\n\tvalue any\n}\n\ntype userData []userDataKV\n\nfunc (d *userData)\
+    \ Set(key, value any) {\n\tif b, ok := key.([]byte); ok {\n\t\tkey = string(b)\n\
+    \t}\n\targs := *d\n\tn := len(args)\n\tfor i := 0; i < n; i++ {\n\t\tkv := &args[i]\n\
+    \t\tif kv.key == key {\n\t\t\tkv.value = value\n\t\t\treturn\n\t\t}\n\t}\n\n\t\
+    if value == nil {\n\t\treturn\n\t}\n\n\tc := cap(args)\n\tif c > n {\n\t\targs\
+    \ = args[:n+1]\n\t\tkv := &args[n]\n\t\tkv.key = key\n\t\tkv.value = value\n\t\
+    \t*d = args\n\t\treturn\n\t}\n\n\tkv := userDataKV{}\n\tkv.key = key\n\tkv.value\
+    \ = value\n\targs = append(args, kv)\n\t*d = args\n}\n\nfunc (d *userData) SetBytes(key\
+    \ []byte, value any) {\n\td.Set(key, value)\n}\n\nfunc (d *userData) Get(key any)\
+    \ any {\n\tif b, ok := key.([]byte); ok {\n\t\tkey = b2s(b)\n\t}\n\targs := *d\n\
+    \tn := len(args)\n\tfor i := 0; i < n; i++ {\n\t\tkv := &args[i]\n\t\tif kv.key\
+    \ == key {\n\t\t\treturn kv.value\n\t\t}\n\t}\n\treturn nil\n}\n\nfunc (d *userData)\
+    \ GetBytes(key []byte) any {\n\treturn d.Get(key)\n}\n\nfunc (d *userData) Reset()\
+    \ {\n\targs := *d\n\tn := len(args)\n\tfor i := 0; i < n; i++ {\n\t\tv := args[i].value\n\
+    \t\tif vc, ok := v.(io.Closer); ok {\n\t\t\tvc.Close()\n\t\t}\n\t\t(*d)[i].value\
+    \ = nil\n\t\t(*d)[i].key = nil\n\t}\n\t*d = (*d)[:0]\n}\n\nfunc (d *userData)\
+    \ Remove(key any) {\n\tif b, ok := key.([]byte); ok {\n\t\tkey = b2s(b)\n\t}\n\
+    \targs := *d\n\tn := len(args)\n\tfor i := 0; i < n; i++ {\n\t\tkv := &args[i]\n\
+    \t\tif kv.key == key {\n\t\t\tn--\n\t\t\targs[i], args[n] = args[n], args[i]\n\
+    \t\t\targs[n].key = nil\n\t\t\targs[n].value = nil\n\t\t\targs = args[:n]\n\t\t\
+    \t*d = args\n\t\t\treturn\n\t\t}\n\t}\n}\n\nfunc (d *userData) RemoveBytes(key\
+    \ []byte) {\n\td.Remove(key)\n}\n\n### Source File Dependency Files Content\n\
+    ### Dependency File: empty.go\n\nOutput the complete test file, code only, no\
+    \ explanations.\n### Time\nCurrent time: 2025-03-23 23:30:29\n"
+  role: user

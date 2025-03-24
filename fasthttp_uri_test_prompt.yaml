@@ -1,0 +1,317 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: fasthttp\nTest File Path: fasthttp\\uri_test.go\\\
+    uri_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: fasthttp\\uri_test.go\\source_files\\\
+    uri.go\npackage fasthttp\n\nimport (\n\t\"bytes\"\n\t\"errors\"\n\t\"fmt\"\n\t\
+    \"io\"\n\t\"path/filepath\"\n\t\"strconv\"\n\t\"sync\"\n)\n\n// AcquireURI returns\
+    \ an empty URI instance from the pool.\n//\n// Release the URI with ReleaseURI\
+    \ after the URI is no longer needed.\n// This allows reducing GC load.\nfunc AcquireURI()\
+    \ *URI {\n\treturn uriPool.Get().(*URI)\n}\n\n// ReleaseURI releases the URI acquired\
+    \ via AcquireURI.\n//\n// The released URI mustn't be used after releasing it,\
+    \ otherwise data races\n// may occur.\nfunc ReleaseURI(u *URI) {\n\tu.Reset()\n\
+    \turiPool.Put(u)\n}\n\nvar uriPool = &sync.Pool{\n\tNew: func() any {\n\t\treturn\
+    \ &URI{}\n\t},\n}\n\n// URI represents URI :) .\n//\n// It is forbidden copying\
+    \ URI instances. Create new instance and use CopyTo\n// instead.\n//\n// URI instance\
+    \ MUST NOT be used from concurrently running goroutines.\ntype URI struct {\n\t\
+    noCopy noCopy\n\n\tqueryArgs Args\n\n\tpathOriginal []byte\n\tscheme       []byte\n\
+    \tpath         []byte\n\tqueryString  []byte\n\thash         []byte\n\thost  \
+    \       []byte\n\n\tfullURI    []byte\n\trequestURI []byte\n\n\tusername     \
+    \   []byte\n\tpassword        []byte\n\tparsedQueryArgs bool\n\n\t// Path values\
+    \ are sent as-is without normalization.\n\t//\n\t// Disabled path normalization\
+    \ may be useful for proxying incoming requests\n\t// to servers that are expecting\
+    \ paths to be forwarded as-is.\n\t//\n\t// By default path values are normalized,\
+    \ i.e.\n\t// extra slashes are removed, special characters are encoded.\n\tDisablePathNormalizing\
+    \ bool\n}\n\n// CopyTo copies uri contents to dst.\nfunc (u *URI) CopyTo(dst *URI)\
+    \ {\n\tdst.Reset()\n\tdst.pathOriginal = append(dst.pathOriginal, u.pathOriginal...)\n\
+    \tdst.scheme = append(dst.scheme, u.scheme...)\n\tdst.path = append(dst.path,\
+    \ u.path...)\n\tdst.queryString = append(dst.queryString, u.queryString...)\n\t\
+    dst.hash = append(dst.hash, u.hash...)\n\tdst.host = append(dst.host, u.host...)\n\
+    \tdst.username = append(dst.username, u.username...)\n\tdst.password = append(dst.password,\
+    \ u.password...)\n\n\tu.queryArgs.CopyTo(&dst.queryArgs)\n\tdst.parsedQueryArgs\
+    \ = u.parsedQueryArgs\n\tdst.DisablePathNormalizing = u.DisablePathNormalizing\n\
+    \n\t// fullURI and requestURI shouldn't be copied, since they are created\n\t\
+    // from scratch on each FullURI() and RequestURI() call.\n}\n\n// Hash returns\
+    \ URI hash, i.e. qwe of http://aaa.com/foo/bar?baz=123#qwe .\n//\n// The returned\
+    \ bytes are valid until the next URI method call.\nfunc (u *URI) Hash() []byte\
+    \ {\n\treturn u.hash\n}\n\n// SetHash sets URI hash.\nfunc (u *URI) SetHash(hash\
+    \ string) {\n\tu.hash = append(u.hash[:0], hash...)\n}\n\n// SetHashBytes sets\
+    \ URI hash.\nfunc (u *URI) SetHashBytes(hash []byte) {\n\tu.hash = append(u.hash[:0],\
+    \ hash...)\n}\n\n// Username returns URI username\n//\n// The returned bytes are\
+    \ valid until the next URI method call.\nfunc (u *URI) Username() []byte {\n\t\
+    return u.username\n}\n\n// SetUsername sets URI username.\nfunc (u *URI) SetUsername(username\
+    \ string) {\n\tu.username = append(u.username[:0], username...)\n}\n\n// SetUsernameBytes\
+    \ sets URI username.\nfunc (u *URI) SetUsernameBytes(username []byte) {\n\tu.username\
+    \ = append(u.username[:0], username...)\n}\n\n// Password returns URI password.\n\
+    //\n// The returned bytes are valid until the next URI method call.\nfunc (u *URI)\
+    \ Password() []byte {\n\treturn u.password\n}\n\n// SetPassword sets URI password.\n\
+    func (u *URI) SetPassword(password string) {\n\tu.password = append(u.password[:0],\
+    \ password...)\n}\n\n// SetPasswordBytes sets URI password.\nfunc (u *URI) SetPasswordBytes(password\
+    \ []byte) {\n\tu.password = append(u.password[:0], password...)\n}\n\n// QueryString\
+    \ returns URI query string,\n// i.e. baz=123 of http://aaa.com/foo/bar?baz=123#qwe\
+    \ .\n//\n// The returned bytes are valid until the next URI method call.\nfunc\
+    \ (u *URI) QueryString() []byte {\n\treturn u.queryString\n}\n\n// SetQueryString\
+    \ sets URI query string.\nfunc (u *URI) SetQueryString(queryString string) {\n\
+    \tu.queryString = append(u.queryString[:0], queryString...)\n\tu.parsedQueryArgs\
+    \ = false\n}\n\n// SetQueryStringBytes sets URI query string.\nfunc (u *URI) SetQueryStringBytes(queryString\
+    \ []byte) {\n\tu.queryString = append(u.queryString[:0], queryString...)\n\tu.parsedQueryArgs\
+    \ = false\n}\n\n// Path returns URI path, i.e. /foo/bar of http://aaa.com/foo/bar?baz=123#qwe\
+    \ .\n//\n// The returned path is always urldecoded and normalized,\n// i.e. '//f%20obar/baz/../zzz'\
+    \ becomes '/f obar/zzz'.\n//\n// The returned bytes are valid until the next URI\
+    \ method call.\nfunc (u *URI) Path() []byte {\n\tpath := u.path\n\tif len(path)\
+    \ == 0 {\n\t\tpath = strSlash\n\t}\n\treturn path\n}\n\n// SetPath sets URI path.\n\
+    func (u *URI) SetPath(path string) {\n\tu.pathOriginal = append(u.pathOriginal[:0],\
+    \ path...)\n\tu.path = normalizePath(u.path, u.pathOriginal)\n}\n\n// SetPathBytes\
+    \ sets URI path.\nfunc (u *URI) SetPathBytes(path []byte) {\n\tu.pathOriginal\
+    \ = append(u.pathOriginal[:0], path...)\n\tu.path = normalizePath(u.path, u.pathOriginal)\n\
+    }\n\n// PathOriginal returns the original path from requestURI passed to URI.Parse().\n\
+    //\n// The returned bytes are valid until the next URI method call.\nfunc (u *URI)\
+    \ PathOriginal() []byte {\n\treturn u.pathOriginal\n}\n\n// Scheme returns URI\
+    \ scheme, i.e. http of http://aaa.com/foo/bar?baz=123#qwe .\n//\n// Returned scheme\
+    \ is always lowercased.\n//\n// The returned bytes are valid until the next URI\
+    \ method call.\nfunc (u *URI) Scheme() []byte {\n\tscheme := u.scheme\n\tif len(scheme)\
+    \ == 0 {\n\t\tscheme = strHTTP\n\t}\n\treturn scheme\n}\n\n// SetScheme sets URI\
+    \ scheme, i.e. http, https, ftp, etc.\nfunc (u *URI) SetScheme(scheme string)\
+    \ {\n\tu.scheme = append(u.scheme[:0], scheme...)\n\tlowercaseBytes(u.scheme)\n\
+    }\n\n// SetSchemeBytes sets URI scheme, i.e. http, https, ftp, etc.\nfunc (u *URI)\
+    \ SetSchemeBytes(scheme []byte) {\n\tu.scheme = append(u.scheme[:0], scheme...)\n\
+    \tlowercaseBytes(u.scheme)\n}\n\nfunc (u *URI) isHTTPS() bool {\n\treturn bytes.Equal(u.scheme,\
+    \ strHTTPS)\n}\n\nfunc (u *URI) isHTTP() bool {\n\treturn len(u.scheme) == 0 ||\
+    \ bytes.Equal(u.scheme, strHTTP)\n}\n\n// Reset clears uri.\nfunc (u *URI) Reset()\
+    \ {\n\tu.pathOriginal = u.pathOriginal[:0]\n\tu.scheme = u.scheme[:0]\n\tu.path\
+    \ = u.path[:0]\n\tu.queryString = u.queryString[:0]\n\tu.hash = u.hash[:0]\n\t\
+    u.username = u.username[:0]\n\tu.password = u.password[:0]\n\n\tu.host = u.host[:0]\n\
+    \tu.queryArgs.Reset()\n\tu.parsedQueryArgs = false\n\tu.DisablePathNormalizing\
+    \ = false\n\n\t// There is no need in u.fullURI = u.fullURI[:0], since full uri\n\
+    \t// is calculated on each call to FullURI().\n\n\t// There is no need in u.requestURI\
+    \ = u.requestURI[:0], since requestURI\n\t// is calculated on each call to RequestURI().\n\
+    }\n\n// Host returns host part, i.e. aaa.com of http://aaa.com/foo/bar?baz=123#qwe\
+    \ .\n//\n// Host is always lowercased.\n//\n// The returned bytes are valid until\
+    \ the next URI method call.\nfunc (u *URI) Host() []byte {\n\treturn u.host\n\
+    }\n\n// SetHost sets host for the uri.\nfunc (u *URI) SetHost(host string) {\n\
+    \tu.host = append(u.host[:0], host...)\n\tlowercaseBytes(u.host)\n}\n\n// SetHostBytes\
+    \ sets host for the uri.\nfunc (u *URI) SetHostBytes(host []byte) {\n\tu.host\
+    \ = append(u.host[:0], host...)\n\tlowercaseBytes(u.host)\n}\n\nvar ErrorInvalidURI\
+    \ = errors.New(\"invalid uri\")\n\n// Parse initializes URI from the given host\
+    \ and uri.\n//\n// host may be nil. In this case uri must contain fully qualified\
+    \ uri,\n// i.e. with scheme and host. http is assumed if scheme is omitted.\n\
+    //\n// uri may contain e.g. RequestURI without scheme and host if host is non-empty.\n\
+    func (u *URI) Parse(host, uri []byte) error {\n\treturn u.parse(host, uri, false)\n\
+    }\n\nfunc (u *URI) parse(host, uri []byte, isTLS bool) error {\n\tu.Reset()\n\n\
+    \tif stringContainsCTLByte(uri) {\n\t\treturn ErrorInvalidURI\n\t}\n\n\tif len(host)\
+    \ == 0 || bytes.Contains(uri, strColonSlashSlash) {\n\t\tscheme, newHost, newURI\
+    \ := splitHostURI(host, uri)\n\t\tu.SetSchemeBytes(scheme)\n\t\thost = newHost\n\
+    \t\turi = newURI\n\t}\n\n\tif isTLS {\n\t\tu.SetSchemeBytes(strHTTPS)\n\t}\n\n\
+    \tif n := bytes.IndexByte(host, '@'); n >= 0 {\n\t\tauth := host[:n]\n\t\thost\
+    \ = host[n+1:]\n\n\t\tif n := bytes.IndexByte(auth, ':'); n >= 0 {\n\t\t\tu.username\
+    \ = append(u.username[:0], auth[:n]...)\n\t\t\tu.password = append(u.password[:0],\
+    \ auth[n+1:]...)\n\t\t} else {\n\t\t\tu.username = append(u.username[:0], auth...)\n\
+    \t\t\tu.password = u.password[:0]\n\t\t}\n\t}\n\n\tu.host = append(u.host, host...)\n\
+    \tparsedHost, err := parseHost(u.host)\n\tif err != nil {\n\t\treturn err\n\t\
+    }\n\tu.host = parsedHost\n\tlowercaseBytes(u.host)\n\n\tb := uri\n\tqueryIndex\
+    \ := bytes.IndexByte(b, '?')\n\tfragmentIndex := bytes.IndexByte(b, '#')\n\t//\
+    \ Ignore query in fragment part\n\tif fragmentIndex >= 0 && queryIndex > fragmentIndex\
+    \ {\n\t\tqueryIndex = -1\n\t}\n\n\tif queryIndex < 0 && fragmentIndex < 0 {\n\t\
+    \tu.pathOriginal = append(u.pathOriginal, b...)\n\t\tu.path = normalizePath(u.path,\
+    \ u.pathOriginal)\n\t\treturn nil\n\t}\n\n\tif queryIndex >= 0 {\n\t\t// Path\
+    \ is everything up to the start of the query\n\t\tu.pathOriginal = append(u.pathOriginal,\
+    \ b[:queryIndex]...)\n\t\tu.path = normalizePath(u.path, u.pathOriginal)\n\n\t\
+    \tif fragmentIndex < 0 {\n\t\t\tu.queryString = append(u.queryString, b[queryIndex+1:]...)\n\
+    \t\t} else {\n\t\t\tu.queryString = append(u.queryString, b[queryIndex+1:fragmentIndex]...)\n\
+    \t\t\tu.hash = append(u.hash, b[fragmentIndex+1:]...)\n\t\t}\n\t\treturn nil\n\
+    \t}\n\n\t// fragmentIndex >= 0 && queryIndex < 0\n\t// Path is up to the start\
+    \ of fragment\n\tu.pathOriginal = append(u.pathOriginal, b[:fragmentIndex]...)\n\
+    \tu.path = normalizePath(u.path, u.pathOriginal)\n\tu.hash = append(u.hash, b[fragmentIndex+1:]...)\n\
+    \n\treturn nil\n}\n\n// parseHost parses host as an authority without user\n//\
+    \ information. That is, as host[:port].\n//\n// Based on https://github.com/golang/go/blob/8ac5cbe05d61df0a7a7c9a38ff33305d4dcfea32/src/net/url/url.go#L619\n\
+    //\n// The host is parsed and unescaped in place overwriting the contents of the\
+    \ host parameter.\nfunc parseHost(host []byte) ([]byte, error) {\n\tif len(host)\
+    \ > 0 && host[0] == '[' {\n\t\t// Parse an IP-Literal in RFC 3986 and RFC 6874.\n\
+    \t\t// E.g., \"[fe80::1]\", \"[fe80::1%25en0]\", \"[fe80::1]:80\".\n\t\ti := bytes.LastIndexByte(host,\
+    \ ']')\n\t\tif i < 0 {\n\t\t\treturn nil, errors.New(\"missing ']' in host\")\n\
+    \t\t}\n\t\tcolonPort := host[i+1:]\n\t\tif !validOptionalPort(colonPort) {\n\t\
+    \t\treturn nil, fmt.Errorf(\"invalid port %q after host\", colonPort)\n\t\t}\n\
+    \n\t\t// RFC 6874 defines that %25 (%-encoded percent) introduces\n\t\t// the\
+    \ zone identifier, and the zone identifier can use basically\n\t\t// any %-encoding\
+    \ it likes. That's different from the host, which\n\t\t// can only %-encode non-ASCII\
+    \ bytes.\n\t\t// We do impose some restrictions on the zone, to avoid stupidity\n\
+    \t\t// like newlines.\n\t\tzone := bytes.Index(host[:i], []byte(\"%25\"))\n\t\t\
+    if zone >= 0 {\n\t\t\thost1, err := unescape(host[:zone], encodeHost)\n\t\t\t\
+    if err != nil {\n\t\t\t\treturn nil, err\n\t\t\t}\n\t\t\thost2, err := unescape(host[zone:i],\
+    \ encodeZone)\n\t\t\tif err != nil {\n\t\t\t\treturn nil, err\n\t\t\t}\n\t\t\t\
+    host3, err := unescape(host[i:], encodeHost)\n\t\t\tif err != nil {\n\t\t\t\t\
+    return nil, err\n\t\t\t}\n\t\t\treturn append(host1, append(host2, host3...)...),\
+    \ nil\n\t\t}\n\t} else if i := bytes.LastIndexByte(host, ':'); i != -1 {\n\t\t\
+    colonPort := host[i:]\n\t\tif !validOptionalPort(colonPort) {\n\t\t\treturn nil,\
+    \ fmt.Errorf(\"invalid port %q after host\", colonPort)\n\t\t}\n\t}\n\n\tvar err\
+    \ error\n\tif host, err = unescape(host, encodeHost); err != nil {\n\t\treturn\
+    \ nil, err\n\t}\n\treturn host, nil\n}\n\ntype encoding int\n\nconst (\n\tencodeHost\
+    \ encoding = 1 + iota\n\tencodeZone\n)\n\ntype EscapeError string\n\nfunc (e EscapeError)\
+    \ Error() string {\n\treturn \"invalid URL escape \" + strconv.Quote(string(e))\n\
+    }\n\ntype InvalidHostError string\n\nfunc (e InvalidHostError) Error() string\
+    \ {\n\treturn \"invalid character \" + strconv.Quote(string(e)) + \" in host name\"\
+    \n}\n\n// unescape unescapes a string; the mode specifies\n// which section of\
+    \ the URL string is being unescaped.\n//\n// Based on https://github.com/golang/go/blob/8ac5cbe05d61df0a7a7c9a38ff33305d4dcfea32/src/net/url/url.go#L199\n\
+    //\n// Unescapes in place overwriting the contents of s and returning it.\nfunc\
+    \ unescape(s []byte, mode encoding) ([]byte, error) {\n\t// Count %, check that\
+    \ they're well-formed.\n\tn := 0\n\tfor i := 0; i < len(s); {\n\t\tswitch s[i]\
+    \ {\n\t\tcase '%':\n\t\t\tn++\n\t\t\tif i+2 >= len(s) || !ishex(s[i+1]) || !ishex(s[i+2])\
+    \ {\n\t\t\t\ts = s[i:]\n\t\t\t\tif len(s) > 3 {\n\t\t\t\t\ts = s[:3]\n\t\t\t\t\
+    }\n\t\t\t\treturn nil, EscapeError(s)\n\t\t\t}\n\t\t\t// Per https://tools.ietf.org/html/rfc3986#page-21\n\
+    \t\t\t// in the host component %-encoding can only be used\n\t\t\t// for non-ASCII\
+    \ bytes.\n\t\t\t// But https://tools.ietf.org/html/rfc6874#section-2\n\t\t\t//\
+    \ introduces %25 being allowed to escape a percent sign\n\t\t\t// in IPv6 scoped-address\
+    \ literals. Yay.\n\t\t\tif mode == encodeHost && unhex(s[i+1]) < 8 && !bytes.Equal(s[i:i+3],\
+    \ []byte(\"%25\")) {\n\t\t\t\treturn nil, EscapeError(s[i : i+3])\n\t\t\t}\n\t\
+    \t\tif mode == encodeZone {\n\t\t\t\t// RFC 6874 says basically \"anything goes\"\
+    \ for zone identifiers\n\t\t\t\t// and that even non-ASCII can be redundantly\
+    \ escaped,\n\t\t\t\t// but it seems prudent to restrict %-escaped bytes here to\
+    \ those\n\t\t\t\t// that are valid host name bytes in their unescaped form.\n\t\
+    \t\t\t// That is, you can use escaping in the zone identifier but not\n\t\t\t\t\
+    // to introduce bytes you couldn't just write directly.\n\t\t\t\t// But Windows\
+    \ puts spaces here! Yay.\n\t\t\t\tv := unhex(s[i+1])<<4 | unhex(s[i+2])\n\t\t\t\
+    \tif !bytes.Equal(s[i:i+3], []byte(\"%25\")) && v != ' ' && shouldEscape(v, encodeHost)\
+    \ {\n\t\t\t\t\treturn nil, EscapeError(s[i : i+3])\n\t\t\t\t}\n\t\t\t}\n\t\t\t\
+    i += 3\n\t\tdefault:\n\t\t\tif (mode == encodeHost || mode == encodeZone) && s[i]\
+    \ < 0x80 && shouldEscape(s[i], mode) {\n\t\t\t\treturn nil, InvalidHostError(s[i\
+    \ : i+1])\n\t\t\t}\n\t\t\ti++\n\t\t}\n\t}\n\n\tif n == 0 {\n\t\treturn s, nil\n\
+    \t}\n\n\tt := s[:0]\n\tfor i := 0; i < len(s); i++ {\n\t\tswitch s[i] {\n\t\t\
+    case '%':\n\t\t\tt = append(t, unhex(s[i+1])<<4|unhex(s[i+2]))\n\t\t\ti += 2\n\
+    \t\tdefault:\n\t\t\tt = append(t, s[i])\n\t\t}\n\t}\n\treturn t, nil\n}\n\n//\
+    \ Return true if the specified character should be escaped when\n// appearing\
+    \ in a URL string, according to RFC 3986.\n//\n// Please be informed that for\
+    \ now shouldEscape does not check all\n// reserved characters correctly. See https://github.com/golang/go/issues/5684.\n\
+    //\n// Based on https://github.com/golang/go/blob/8ac5cbe05d61df0a7a7c9a38ff33305d4dcfea32/src/net/url/url.go#L100\n\
+    func shouldEscape(c byte, mode encoding) bool {\n\t// §2.3 Unreserved characters\
+    \ (alphanum)\n\tif 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c &&\
+    \ c <= '9' {\n\t\treturn false\n\t}\n\n\tif mode == encodeHost || mode == encodeZone\
+    \ {\n\t\t// §3.2.2 Host allows\n\t\t//\tsub-delims = \"!\" / \"$\" / \"&\" / \"\
+    '\" / \"(\" / \")\" / \"*\" / \"+\" / \",\" / \";\" / \"=\"\n\t\t// as part of\
+    \ reg-name.\n\t\t// We add : because we include :port as part of host.\n\t\t//\
+    \ We add [ ] because we include [ipv6]:port as part of host.\n\t\t// We add <\
+    \ > because they're the only characters left that\n\t\t// we could possibly allow,\
+    \ and Parse will reject them if we\n\t\t// escape them (because hosts can't use\
+    \ %-encoding for\n\t\t// ASCII bytes).\n\t\tswitch c {\n\t\tcase '!', '$', '&',\
+    \ '\\'', '(', ')', '*', '+', ',', ';', '=', ':', '[', ']', '<', '>', '\"':\n\t\
+    \t\treturn false\n\t\t}\n\t}\n\n\tif c == '-' || c == '_' || c == '.' || c ==\
+    \ '~' { // §2.3 Unreserved characters (mark)\n\t\treturn false\n\t}\n\n\t// Everything\
+    \ else must be escaped.\n\treturn true\n}\n\nfunc ishex(c byte) bool {\n\treturn\
+    \ hex2intTable[c] < 16\n}\n\nfunc unhex(c byte) byte {\n\treturn hex2intTable[c]\
+    \ & 15\n}\n\n// validOptionalPort reports whether port is either an empty string\n\
+    // or matches /^:\\d*$/.\nfunc validOptionalPort(port []byte) bool {\n\tif len(port)\
+    \ == 0 {\n\t\treturn true\n\t}\n\tif port[0] != ':' {\n\t\treturn false\n\t}\n\
+    \tfor _, b := range port[1:] {\n\t\tif b < '0' || b > '9' {\n\t\t\treturn false\n\
+    \t\t}\n\t}\n\treturn true\n}\n\nfunc normalizePath(dst, src []byte) []byte {\n\
+    \tdst = dst[:0]\n\tdst = addLeadingSlash(dst, src)\n\tdst = decodeArgAppendNoPlus(dst,\
+    \ src)\n\n\t// remove duplicate slashes\n\tb := dst\n\tbSize := len(b)\n\tfor\
+    \ {\n\t\tn := bytes.Index(b, strSlashSlash)\n\t\tif n < 0 {\n\t\t\tbreak\n\t\t\
+    }\n\t\tb = b[n:]\n\t\tcopy(b, b[1:])\n\t\tb = b[:len(b)-1]\n\t\tbSize--\n\t}\n\
+    \tdst = dst[:bSize]\n\n\t// remove /./ parts\n\tb = dst\n\tfor {\n\t\tn := bytes.Index(b,\
+    \ strSlashDotSlash)\n\t\tif n < 0 {\n\t\t\tbreak\n\t\t}\n\t\tnn := n + len(strSlashDotSlash)\
+    \ - 1\n\t\tcopy(b[n:], b[nn:])\n\t\tb = b[:len(b)-nn+n]\n\t}\n\n\t// remove /foo/../\
+    \ parts\n\tfor {\n\t\tn := bytes.Index(b, strSlashDotDotSlash)\n\t\tif n < 0 {\n\
+    \t\t\tbreak\n\t\t}\n\t\tnn := bytes.LastIndexByte(b[:n], '/')\n\t\tif nn < 0 {\n\
+    \t\t\tnn = 0\n\t\t}\n\t\tn += len(strSlashDotDotSlash) - 1\n\t\tcopy(b[nn:], b[n:])\n\
+    \t\tb = b[:len(b)-n+nn]\n\t}\n\n\t// remove trailing /foo/..\n\tn := bytes.LastIndex(b,\
+    \ strSlashDotDot)\n\tif n >= 0 && n+len(strSlashDotDot) == len(b) {\n\t\tnn :=\
+    \ bytes.LastIndexByte(b[:n], '/')\n\t\tif nn < 0 {\n\t\t\treturn append(dst[:0],\
+    \ strSlash...)\n\t\t}\n\t\tb = b[:nn+1]\n\t}\n\n\tif filepath.Separator == '\\\
+    \\' {\n\t\t// remove \\.\\ parts\n\t\tfor {\n\t\t\tn := bytes.Index(b, strBackSlashDotBackSlash)\n\
+    \t\t\tif n < 0 {\n\t\t\t\tbreak\n\t\t\t}\n\t\t\tnn := n + len(strSlashDotSlash)\
+    \ - 1\n\t\t\tcopy(b[n:], b[nn:])\n\t\t\tb = b[:len(b)-nn+n]\n\t\t}\n\n\t\t// remove\
+    \ /foo/..\\ parts\n\t\tfor {\n\t\t\tn := bytes.Index(b, strSlashDotDotBackSlash)\n\
+    \t\t\tif n < 0 {\n\t\t\t\tbreak\n\t\t\t}\n\t\t\tnn := bytes.LastIndexByte(b[:n],\
+    \ '/')\n\t\t\tif nn < 0 {\n\t\t\t\tnn = 0\n\t\t\t}\n\t\t\tnn++\n\t\t\tn += len(strSlashDotDotBackSlash)\n\
+    \t\t\tcopy(b[nn:], b[n:])\n\t\t\tb = b[:len(b)-n+nn]\n\t\t}\n\n\t\t// remove /foo\\\
+    ..\\ parts\n\t\tfor {\n\t\t\tn := bytes.Index(b, strBackSlashDotDotBackSlash)\n\
+    \t\t\tif n < 0 {\n\t\t\t\tbreak\n\t\t\t}\n\t\t\tnn := bytes.LastIndexByte(b[:n],\
+    \ '/')\n\t\t\tif nn < 0 {\n\t\t\t\tnn = 0\n\t\t\t}\n\t\t\tn += len(strBackSlashDotDotBackSlash)\
+    \ - 1\n\t\t\tcopy(b[nn:], b[n:])\n\t\t\tb = b[:len(b)-n+nn]\n\t\t}\n\n\t\t// remove\
+    \ trailing \\foo\\..\n\t\tn := bytes.LastIndex(b, strBackSlashDotDot)\n\t\tif\
+    \ n >= 0 && n+len(strSlashDotDot) == len(b) {\n\t\t\tnn := bytes.LastIndexByte(b[:n],\
+    \ '/')\n\t\t\tif nn < 0 {\n\t\t\t\treturn append(dst[:0], strSlash...)\n\t\t\t\
+    }\n\t\t\tb = b[:nn+1]\n\t\t}\n\t}\n\n\treturn b\n}\n\n// RequestURI returns RequestURI\
+    \ - i.e. URI without Scheme and Host.\nfunc (u *URI) RequestURI() []byte {\n\t\
+    var dst []byte\n\tif u.DisablePathNormalizing {\n\t\tdst = u.requestURI[:0]\n\t\
+    \tdst = append(dst, u.PathOriginal()...)\n\t} else {\n\t\tdst = appendQuotedPath(u.requestURI[:0],\
+    \ u.Path())\n\t}\n\tif u.parsedQueryArgs && u.queryArgs.Len() > 0 {\n\t\tdst =\
+    \ append(dst, '?')\n\t\tdst = u.queryArgs.AppendBytes(dst)\n\t} else if len(u.queryString)\
+    \ > 0 {\n\t\tdst = append(dst, '?')\n\t\tdst = append(dst, u.queryString...)\n\
+    \t}\n\tu.requestURI = dst\n\treturn u.requestURI\n}\n\n// LastPathSegment returns\
+    \ the last part of uri path after '/'.\n//\n// Examples:\n//\n//   - For /foo/bar/baz.html\
+    \ path returns baz.html.\n//   - For /foo/bar/ returns empty byte slice.\n// \
+    \  - For /foobar.js returns foobar.js.\n//\n// The returned bytes are valid until\
+    \ the next URI method call.\nfunc (u *URI) LastPathSegment() []byte {\n\tpath\
+    \ := u.Path()\n\tn := bytes.LastIndexByte(path, '/')\n\tif n < 0 {\n\t\treturn\
+    \ path\n\t}\n\treturn path[n+1:]\n}\n\n// Update updates uri.\n//\n// The following\
+    \ newURI types are accepted:\n//\n//   - Absolute, i.e. http://foobar.com/aaa/bb?cc\
+    \ . In this case the original\n//     uri is replaced by newURI.\n//   - Absolute\
+    \ without scheme, i.e. //foobar.com/aaa/bb?cc. In this case\n//     the original\
+    \ scheme is preserved.\n//   - Missing host, i.e. /aaa/bb?cc . In this case only\
+    \ RequestURI part\n//     of the original uri is replaced.\n//   - Relative path,\
+    \ i.e.  xx?yy=abc . In this case the original RequestURI\n//     is updated according\
+    \ to the new relative path.\nfunc (u *URI) Update(newURI string) {\n\tu.UpdateBytes(s2b(newURI))\n\
+    }\n\n// UpdateBytes updates uri.\n//\n// The following newURI types are accepted:\n\
+    //\n//   - Absolute, i.e. http://foobar.com/aaa/bb?cc . In this case the original\n\
+    //     uri is replaced by newURI.\n//   - Absolute without scheme, i.e. //foobar.com/aaa/bb?cc.\
+    \ In this case\n//     the original scheme is preserved.\n//   - Missing host,\
+    \ i.e. /aaa/bb?cc . In this case only RequestURI part\n//     of the original\
+    \ uri is replaced.\n//   - Relative path, i.e.  xx?yy=abc . In this case the original\
+    \ RequestURI\n//     is updated according to the new relative path.\nfunc (u *URI)\
+    \ UpdateBytes(newURI []byte) {\n\tu.requestURI = u.updateBytes(newURI, u.requestURI)\n\
+    }\n\nfunc (u *URI) updateBytes(newURI, buf []byte) []byte {\n\tif len(newURI)\
+    \ == 0 {\n\t\treturn buf\n\t}\n\n\tn := bytes.Index(newURI, strSlashSlash)\n\t\
+    if n >= 0 {\n\t\t// absolute uri\n\t\tvar b [32]byte\n\t\tschemeOriginal := b[:0]\n\
+    \t\tif len(u.scheme) > 0 {\n\t\t\tschemeOriginal = append([]byte(nil), u.scheme...)\n\
+    \t\t}\n\t\tif err := u.Parse(nil, newURI); err != nil {\n\t\t\treturn nil\n\t\t\
+    }\n\t\tif len(schemeOriginal) > 0 && len(u.scheme) == 0 {\n\t\t\tu.scheme = append(u.scheme[:0],\
+    \ schemeOriginal...)\n\t\t}\n\t\treturn buf\n\t}\n\n\tif newURI[0] == '/' {\n\t\
+    \t// uri without host\n\t\tbuf = u.appendSchemeHost(buf[:0])\n\t\tbuf = append(buf,\
+    \ newURI...)\n\t\tif err := u.Parse(nil, buf); err != nil {\n\t\t\treturn nil\n\
+    \t\t}\n\t\treturn buf\n\t}\n\n\t// relative path\n\tswitch newURI[0] {\n\tcase\
+    \ '?':\n\t\t// query string only update\n\t\tu.SetQueryStringBytes(newURI[1:])\n\
+    \t\treturn append(buf[:0], u.FullURI()...)\n\tcase '#':\n\t\t// update only hash\n\
+    \t\tu.SetHashBytes(newURI[1:])\n\t\treturn append(buf[:0], u.FullURI()...)\n\t\
+    default:\n\t\t// update the last path part after the slash\n\t\tpath := u.Path()\n\
+    \t\tn = bytes.LastIndexByte(path, '/')\n\t\tif n < 0 {\n\t\t\tpanic(fmt.Sprintf(\"\
+    BUG: path must contain at least one slash: %q %q\", u.Path(), newURI))\n\t\t}\n\
+    \t\tbuf = u.appendSchemeHost(buf[:0])\n\t\tbuf = appendQuotedPath(buf, path[:n+1])\n\
+    \t\tbuf = append(buf, newURI...)\n\t\tif err := u.Parse(nil, buf); err != nil\
+    \ {\n\t\t\treturn nil\n\t\t}\n\t\treturn buf\n\t}\n}\n\n// FullURI returns full\
+    \ uri in the form {Scheme}://{Host}{RequestURI}#{Hash}.\n//\n// The returned bytes\
+    \ are valid until the next URI method call.\nfunc (u *URI) FullURI() []byte {\n\
+    \tu.fullURI = u.AppendBytes(u.fullURI[:0])\n\treturn u.fullURI\n}\n\n// AppendBytes\
+    \ appends full uri to dst and returns the extended dst.\nfunc (u *URI) AppendBytes(dst\
+    \ []byte) []byte {\n\tdst = u.appendSchemeHost(dst)\n\tdst = append(dst, u.RequestURI()...)\n\
+    \tif len(u.hash) > 0 {\n\t\tdst = append(dst, '#')\n\t\tdst = append(dst, u.hash...)\n\
+    \t}\n\treturn dst\n}\n\nfunc (u *URI) appendSchemeHost(dst []byte) []byte {\n\t\
+    dst = append(dst, u.Scheme()...)\n\tdst = append(dst, strColonSlashSlash...)\n\
+    \treturn append(dst, u.Host()...)\n}\n\n// WriteTo writes full uri to w.\n//\n\
+    // WriteTo implements io.WriterTo interface.\nfunc (u *URI) WriteTo(w io.Writer)\
+    \ (int64, error) {\n\tn, err := w.Write(u.FullURI())\n\treturn int64(n), err\n\
+    }\n\n// String returns full uri.\nfunc (u *URI) String() string {\n\treturn string(u.FullURI())\n\
+    }\n\nfunc splitHostURI(host, uri []byte) ([]byte, []byte, []byte) {\n\tn := bytes.Index(uri,\
+    \ strSlashSlash)\n\tif n < 0 {\n\t\treturn strHTTP, host, uri\n\t}\n\tscheme :=\
+    \ uri[:n]\n\tif bytes.IndexByte(scheme, '/') >= 0 {\n\t\treturn strHTTP, host,\
+    \ uri\n\t}\n\tif len(scheme) > 0 && scheme[len(scheme)-1] == ':' {\n\t\tscheme\
+    \ = scheme[:len(scheme)-1]\n\t}\n\tn += len(strSlashSlash)\n\turi = uri[n:]\n\t\
+    n = bytes.IndexByte(uri, '/')\n\tnq := bytes.IndexByte(uri, '?')\n\tif nq >= 0\
+    \ && (n < 0 || nq < n) {\n\t\t// A hack for urls like foobar.com?a=b/xyz\n\t\t\
+    n = nq\n\t}\n\tnh := bytes.IndexByte(uri, '#')\n\tif nh >= 0 && (n < 0 || nh <\
+    \ n) {\n\t\t// A hack for urls like foobar.com#abc.com\n\t\tn = nh\n\t}\n\tif\
+    \ n < 0 {\n\t\treturn scheme, uri, strSlash\n\t}\n\treturn scheme, uri[:n], uri[n:]\n\
+    }\n\n// QueryArgs returns query args.\n//\n// The returned args are valid until\
+    \ the next URI method call.\nfunc (u *URI) QueryArgs() *Args {\n\tu.parseQueryArgs()\n\
+    \treturn &u.queryArgs\n}\n\nfunc (u *URI) parseQueryArgs() {\n\tif u.parsedQueryArgs\
+    \ {\n\t\treturn\n\t}\n\tu.queryArgs.ParseBytes(u.queryString)\n\tu.parsedQueryArgs\
+    \ = true\n}\n\n// stringContainsCTLByte reports whether s contains any ASCII control\
+    \ character.\nfunc stringContainsCTLByte(s []byte) bool {\n\tfor i := 0; i < len(s);\
+    \ i++ {\n\t\tb := s[i]\n\t\tif b < ' ' || b == 0x7f {\n\t\t\treturn true\n\t\t\
+    }\n\t}\n\treturn false\n}\n\n### Source File Dependency Files Content\n### Dependency\
+    \ File: empty.go\n\nOutput the complete test file, code only, no explanations.\n\
+    ### Time\nCurrent time: 2025-03-23 23:30:15\n"
+  role: user

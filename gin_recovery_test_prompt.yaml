@@ -1,0 +1,84 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: gin\nTest File Path: gin\\recovery_test.go\\\
+    recovery_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: gin\\recovery_test.go\\source_files\\\
+    recovery.go\n// Copyright 2014 Manu Martinez-Almeida. All rights reserved.\n//\
+    \ Use of this source code is governed by a MIT style\n// license that can be found\
+    \ in the LICENSE file.\n\npackage gin\n\nimport (\n\t\"bytes\"\n\t\"errors\"\n\
+    \t\"fmt\"\n\t\"io\"\n\t\"log\"\n\t\"net\"\n\t\"net/http\"\n\t\"net/http/httputil\"\
+    \n\t\"os\"\n\t\"runtime\"\n\t\"strings\"\n\t\"time\"\n)\n\nvar (\n\tdunno    \
+    \ = []byte(\"???\")\n\tcenterDot = []byte(\"·\")\n\tdot       = []byte(\".\")\n\
+    \tslash     = []byte(\"/\")\n)\n\n// RecoveryFunc defines the function passable\
+    \ to CustomRecovery.\ntype RecoveryFunc func(c *Context, err any)\n\n// Recovery\
+    \ returns a middleware that recovers from any panics and writes a 500 if there\
+    \ was one.\nfunc Recovery() HandlerFunc {\n\treturn RecoveryWithWriter(DefaultErrorWriter)\n\
+    }\n\n// CustomRecovery returns a middleware that recovers from any panics and\
+    \ calls the provided handle func to handle it.\nfunc CustomRecovery(handle RecoveryFunc)\
+    \ HandlerFunc {\n\treturn RecoveryWithWriter(DefaultErrorWriter, handle)\n}\n\n\
+    // RecoveryWithWriter returns a middleware for a given writer that recovers from\
+    \ any panics and writes a 500 if there was one.\nfunc RecoveryWithWriter(out io.Writer,\
+    \ recovery ...RecoveryFunc) HandlerFunc {\n\tif len(recovery) > 0 {\n\t\treturn\
+    \ CustomRecoveryWithWriter(out, recovery[0])\n\t}\n\treturn CustomRecoveryWithWriter(out,\
+    \ defaultHandleRecovery)\n}\n\n// CustomRecoveryWithWriter returns a middleware\
+    \ for a given writer that recovers from any panics and calls the provided handle\
+    \ func to handle it.\nfunc CustomRecoveryWithWriter(out io.Writer, handle RecoveryFunc)\
+    \ HandlerFunc {\n\tvar logger *log.Logger\n\tif out != nil {\n\t\tlogger = log.New(out,\
+    \ \"\\n\\n\\x1b[31m\", log.LstdFlags)\n\t}\n\treturn func(c *Context) {\n\t\t\
+    defer func() {\n\t\t\tif err := recover(); err != nil {\n\t\t\t\t// Check for\
+    \ a broken connection, as it is not really a\n\t\t\t\t// condition that warrants\
+    \ a panic stack trace.\n\t\t\t\tvar brokenPipe bool\n\t\t\t\tif ne, ok := err.(*net.OpError);\
+    \ ok {\n\t\t\t\t\tvar se *os.SyscallError\n\t\t\t\t\tif errors.As(ne, &se) {\n\
+    \t\t\t\t\t\tseStr := strings.ToLower(se.Error())\n\t\t\t\t\t\tif strings.Contains(seStr,\
+    \ \"broken pipe\") ||\n\t\t\t\t\t\t\tstrings.Contains(seStr, \"connection reset\
+    \ by peer\") {\n\t\t\t\t\t\t\tbrokenPipe = true\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\
+    \t\t\t}\n\t\t\t\tif logger != nil {\n\t\t\t\t\tstack := stack(3)\n\t\t\t\t\thttpRequest,\
+    \ _ := httputil.DumpRequest(c.Request, false)\n\t\t\t\t\theaders := strings.Split(string(httpRequest),\
+    \ \"\\r\\n\")\n\t\t\t\t\tfor idx, header := range headers {\n\t\t\t\t\t\tcurrent\
+    \ := strings.Split(header, \":\")\n\t\t\t\t\t\tif current[0] == \"Authorization\"\
+    \ {\n\t\t\t\t\t\t\theaders[idx] = current[0] + \": *\"\n\t\t\t\t\t\t}\n\t\t\t\t\
+    \t}\n\t\t\t\t\theadersToStr := strings.Join(headers, \"\\r\\n\")\n\t\t\t\t\tif\
+    \ brokenPipe {\n\t\t\t\t\t\tlogger.Printf(\"%s\\n%s%s\", err, headersToStr, reset)\n\
+    \t\t\t\t\t} else if IsDebugging() {\n\t\t\t\t\t\tlogger.Printf(\"[Recovery] %s\
+    \ panic recovered:\\n%s\\n%s\\n%s%s\",\n\t\t\t\t\t\t\ttimeFormat(time.Now()),\
+    \ headersToStr, err, stack, reset)\n\t\t\t\t\t} else {\n\t\t\t\t\t\tlogger.Printf(\"\
+    [Recovery] %s panic recovered:\\n%s\\n%s%s\",\n\t\t\t\t\t\t\ttimeFormat(time.Now()),\
+    \ err, stack, reset)\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tif brokenPipe {\n\t\t\t\t\
+    \t// If the connection is dead, we can't write a status to it.\n\t\t\t\t\tc.Error(err.(error))\
+    \ //nolint: errcheck\n\t\t\t\t\tc.Abort()\n\t\t\t\t} else {\n\t\t\t\t\thandle(c,\
+    \ err)\n\t\t\t\t}\n\t\t\t}\n\t\t}()\n\t\tc.Next()\n\t}\n}\n\nfunc defaultHandleRecovery(c\
+    \ *Context, _ any) {\n\tc.AbortWithStatus(http.StatusInternalServerError)\n}\n\
+    \n// stack returns a nicely formatted stack frame, skipping skip frames.\nfunc\
+    \ stack(skip int) []byte {\n\tbuf := new(bytes.Buffer) // the returned data\n\t\
+    // As we loop, we open files and read them. These variables record the currently\n\
+    \t// loaded file.\n\tvar lines [][]byte\n\tvar lastFile string\n\tfor i := skip;\
+    \ ; i++ { // Skip the expected number of frames\n\t\tpc, file, line, ok := runtime.Caller(i)\n\
+    \t\tif !ok {\n\t\t\tbreak\n\t\t}\n\t\t// Print this much at least.  If we can't\
+    \ find the source, it won't show.\n\t\tfmt.Fprintf(buf, \"%s:%d (0x%x)\\n\", file,\
+    \ line, pc)\n\t\tif file != lastFile {\n\t\t\tdata, err := os.ReadFile(file)\n\
+    \t\t\tif err != nil {\n\t\t\t\tcontinue\n\t\t\t}\n\t\t\tlines = bytes.Split(data,\
+    \ []byte{'\\n'})\n\t\t\tlastFile = file\n\t\t}\n\t\tfmt.Fprintf(buf, \"\\t%s:\
+    \ %s\\n\", function(pc), source(lines, line))\n\t}\n\treturn buf.Bytes()\n}\n\n\
+    // source returns a space-trimmed slice of the n'th line.\nfunc source(lines [][]byte,\
+    \ n int) []byte {\n\tn-- // in stack trace, lines are 1-indexed but our array\
+    \ is 0-indexed\n\tif n < 0 || n >= len(lines) {\n\t\treturn dunno\n\t}\n\treturn\
+    \ bytes.TrimSpace(lines[n])\n}\n\n// function returns, if possible, the name of\
+    \ the function containing the PC.\nfunc function(pc uintptr) []byte {\n\tfn :=\
+    \ runtime.FuncForPC(pc)\n\tif fn == nil {\n\t\treturn dunno\n\t}\n\tname := []byte(fn.Name())\n\
+    \t// The name includes the path name to the package, which is unnecessary\n\t\
+    // since the file name is already included.  Plus, it has center dots.\n\t// That\
+    \ is, we see\n\t//\truntime/debug.*T·ptrmethod\n\t// and want\n\t//\t*T.ptrmethod\n\
+    \t// Also the package path might contain dot (e.g. code.google.com/...),\n\t//\
+    \ so first eliminate the path prefix\n\tif lastSlash := bytes.LastIndex(name,\
+    \ slash); lastSlash >= 0 {\n\t\tname = name[lastSlash+1:]\n\t}\n\tif period :=\
+    \ bytes.Index(name, dot); period >= 0 {\n\t\tname = name[period+1:]\n\t}\n\tname\
+    \ = bytes.ReplaceAll(name, centerDot, dot)\n\treturn name\n}\n\n// timeFormat\
+    \ returns a customized time string for logger.\nfunc timeFormat(t time.Time) string\
+    \ {\n\treturn t.Format(\"2006/01/02 - 15:04:05\")\n}\n\n### Source File Dependency\
+    \ Files Content\n### Dependency File: empty.go\n\nOutput the complete test file,\
+    \ code only, no explanations.\n### Time\nCurrent time: 2025-03-23 23:53:42\n"
+  role: user

@@ -1,0 +1,51 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: gin\nTest File Path: gin\\response_writer_test.go\\\
+    response_writer_test.go\nProject Programming Language: Go\nTesting Framework:\
+    \ go testing\n### Source File Content\n### Source File: gin\\response_writer_test.go\\\
+    source_files\\response_writer.go\n// Copyright 2014 Manu Martinez-Almeida. All\
+    \ rights reserved.\n// Use of this source code is governed by a MIT style\n//\
+    \ license that can be found in the LICENSE file.\n\npackage gin\n\nimport (\n\t\
+    \"bufio\"\n\t\"io\"\n\t\"net\"\n\t\"net/http\"\n)\n\nconst (\n\tnoWritten    \
+    \ = -1\n\tdefaultStatus = http.StatusOK\n)\n\n// ResponseWriter ...\ntype ResponseWriter\
+    \ interface {\n\thttp.ResponseWriter\n\thttp.Hijacker\n\thttp.Flusher\n\thttp.CloseNotifier\n\
+    \n\t// Status returns the HTTP response status code of the current request.\n\t\
+    Status() int\n\n\t// Size returns the number of bytes already written into the\
+    \ response http body.\n\t// See Written()\n\tSize() int\n\n\t// WriteString writes\
+    \ the string into the response body.\n\tWriteString(string) (int, error)\n\n\t\
+    // Written returns true if the response body was already written.\n\tWritten()\
+    \ bool\n\n\t// WriteHeaderNow forces to write the http header (status code + headers).\n\
+    \tWriteHeaderNow()\n\n\t// Pusher get the http.Pusher for server push\n\tPusher()\
+    \ http.Pusher\n}\n\ntype responseWriter struct {\n\thttp.ResponseWriter\n\tsize\
+    \   int\n\tstatus int\n}\n\nvar _ ResponseWriter = (*responseWriter)(nil)\n\n\
+    func (w *responseWriter) Unwrap() http.ResponseWriter {\n\treturn w.ResponseWriter\n\
+    }\n\nfunc (w *responseWriter) reset(writer http.ResponseWriter) {\n\tw.ResponseWriter\
+    \ = writer\n\tw.size = noWritten\n\tw.status = defaultStatus\n}\n\nfunc (w *responseWriter)\
+    \ WriteHeader(code int) {\n\tif code > 0 && w.status != code {\n\t\tif w.Written()\
+    \ {\n\t\t\tdebugPrint(\"[WARNING] Headers were already written. Wanted to override\
+    \ status code %d with %d\", w.status, code)\n\t\t\treturn\n\t\t}\n\t\tw.status\
+    \ = code\n\t}\n}\n\nfunc (w *responseWriter) WriteHeaderNow() {\n\tif !w.Written()\
+    \ {\n\t\tw.size = 0\n\t\tw.ResponseWriter.WriteHeader(w.status)\n\t}\n}\n\nfunc\
+    \ (w *responseWriter) Write(data []byte) (n int, err error) {\n\tw.WriteHeaderNow()\n\
+    \tn, err = w.ResponseWriter.Write(data)\n\tw.size += n\n\treturn\n}\n\nfunc (w\
+    \ *responseWriter) WriteString(s string) (n int, err error) {\n\tw.WriteHeaderNow()\n\
+    \tn, err = io.WriteString(w.ResponseWriter, s)\n\tw.size += n\n\treturn\n}\n\n\
+    func (w *responseWriter) Status() int {\n\treturn w.status\n}\n\nfunc (w *responseWriter)\
+    \ Size() int {\n\treturn w.size\n}\n\nfunc (w *responseWriter) Written() bool\
+    \ {\n\treturn w.size != noWritten\n}\n\n// Hijack implements the http.Hijacker\
+    \ interface.\nfunc (w *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter,\
+    \ error) {\n\tif w.size < 0 {\n\t\tw.size = 0\n\t}\n\treturn w.ResponseWriter.(http.Hijacker).Hijack()\n\
+    }\n\n// CloseNotify implements the http.CloseNotifier interface.\nfunc (w *responseWriter)\
+    \ CloseNotify() <-chan bool {\n\treturn w.ResponseWriter.(http.CloseNotifier).CloseNotify()\n\
+    }\n\n// Flush implements the http.Flusher interface.\nfunc (w *responseWriter)\
+    \ Flush() {\n\tw.WriteHeaderNow()\n\tw.ResponseWriter.(http.Flusher).Flush()\n\
+    }\n\nfunc (w *responseWriter) Pusher() (pusher http.Pusher) {\n\tif pusher, ok\
+    \ := w.ResponseWriter.(http.Pusher); ok {\n\t\treturn pusher\n\t}\n\treturn nil\n\
+    }\n\n### Source File Dependency Files Content\n### Dependency File: empty.go\n\
+    \nOutput the complete test file, code only, no explanations.\n### Time\nCurrent\
+    \ time: 2025-03-23 23:53:54\n"
+  role: user

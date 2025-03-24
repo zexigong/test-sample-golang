@@ -1,0 +1,65 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: chi\nTest File Path: chi\\throttle_test.go\\\
+    throttle_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: chi\\throttle_test.go\\source_files\\\
+    throttle.go\npackage middleware\n\nimport (\n\t\"net/http\"\n\t\"strconv\"\n\t\
+    \"time\"\n)\n\nconst (\n\terrCapacityExceeded = \"Server capacity exceeded.\"\n\
+    \terrTimedOut         = \"Timed out while waiting for a pending request to complete.\"\
+    \n\terrContextCanceled  = \"Context was canceled.\"\n)\n\nvar (\n\tdefaultBacklogTimeout\
+    \ = time.Second * 60\n)\n\n// ThrottleOpts represents a set of throttling options.\n\
+    type ThrottleOpts struct {\n\tRetryAfterFn   func(ctxDone bool) time.Duration\n\
+    \tLimit          int\n\tBacklogLimit   int\n\tBacklogTimeout time.Duration\n\t\
+    StatusCode     int\n}\n\n// Throttle is a middleware that limits number of currently\
+    \ processed requests\n// at a time across all users. Note: Throttle is not a rate-limiter\
+    \ per user,\n// instead it just puts a ceiling on the number of current in-flight\
+    \ requests\n// being processed from the point from where the Throttle middleware\
+    \ is mounted.\nfunc Throttle(limit int) func(http.Handler) http.Handler {\n\t\
+    return ThrottleWithOpts(ThrottleOpts{Limit: limit, BacklogTimeout: defaultBacklogTimeout})\n\
+    }\n\n// ThrottleBacklog is a middleware that limits number of currently processed\n\
+    // requests at a time and provides a backlog for holding a finite number of\n\
+    // pending requests.\nfunc ThrottleBacklog(limit, backlogLimit int, backlogTimeout\
+    \ time.Duration) func(http.Handler) http.Handler {\n\treturn ThrottleWithOpts(ThrottleOpts{Limit:\
+    \ limit, BacklogLimit: backlogLimit, BacklogTimeout: backlogTimeout})\n}\n\n//\
+    \ ThrottleWithOpts is a middleware that limits number of currently processed requests\
+    \ using passed ThrottleOpts.\nfunc ThrottleWithOpts(opts ThrottleOpts) func(http.Handler)\
+    \ http.Handler {\n\tif opts.Limit < 1 {\n\t\tpanic(\"chi/middleware: Throttle\
+    \ expects limit > 0\")\n\t}\n\n\tif opts.BacklogLimit < 0 {\n\t\tpanic(\"chi/middleware:\
+    \ Throttle expects backlogLimit to be positive\")\n\t}\n\n\tstatusCode := opts.StatusCode\n\
+    \tif statusCode == 0 {\n\t\tstatusCode = http.StatusTooManyRequests\n\t}\n\n\t\
+    t := throttler{\n\t\ttokens:         make(chan token, opts.Limit),\n\t\tbacklogTokens:\
+    \  make(chan token, opts.Limit+opts.BacklogLimit),\n\t\tbacklogTimeout: opts.BacklogTimeout,\n\
+    \t\tstatusCode:     statusCode,\n\t\tretryAfterFn:   opts.RetryAfterFn,\n\t}\n\
+    \n\t// Filling tokens.\n\tfor i := 0; i < opts.Limit+opts.BacklogLimit; i++ {\n\
+    \t\tif i < opts.Limit {\n\t\t\tt.tokens <- token{}\n\t\t}\n\t\tt.backlogTokens\
+    \ <- token{}\n\t}\n\n\treturn func(next http.Handler) http.Handler {\n\t\tfn :=\
+    \ func(w http.ResponseWriter, r *http.Request) {\n\t\t\tctx := r.Context()\n\n\
+    \t\t\tselect {\n\n\t\t\tcase <-ctx.Done():\n\t\t\t\tt.setRetryAfterHeaderIfNeeded(w,\
+    \ true)\n\t\t\t\thttp.Error(w, errContextCanceled, t.statusCode)\n\t\t\t\treturn\n\
+    \n\t\t\tcase btok := <-t.backlogTokens:\n\t\t\t\ttimer := time.NewTimer(t.backlogTimeout)\n\
+    \n\t\t\t\tdefer func() {\n\t\t\t\t\tt.backlogTokens <- btok\n\t\t\t\t}()\n\n\t\
+    \t\t\tselect {\n\t\t\t\tcase <-timer.C:\n\t\t\t\t\tt.setRetryAfterHeaderIfNeeded(w,\
+    \ false)\n\t\t\t\t\thttp.Error(w, errTimedOut, t.statusCode)\n\t\t\t\t\treturn\n\
+    \t\t\t\tcase <-ctx.Done():\n\t\t\t\t\ttimer.Stop()\n\t\t\t\t\tt.setRetryAfterHeaderIfNeeded(w,\
+    \ true)\n\t\t\t\t\thttp.Error(w, errContextCanceled, t.statusCode)\n\t\t\t\t\t\
+    return\n\t\t\t\tcase tok := <-t.tokens:\n\t\t\t\t\tdefer func() {\n\t\t\t\t\t\t\
+    timer.Stop()\n\t\t\t\t\t\tt.tokens <- tok\n\t\t\t\t\t}()\n\t\t\t\t\tnext.ServeHTTP(w,\
+    \ r)\n\t\t\t\t}\n\t\t\t\treturn\n\n\t\t\tdefault:\n\t\t\t\tt.setRetryAfterHeaderIfNeeded(w,\
+    \ false)\n\t\t\t\thttp.Error(w, errCapacityExceeded, t.statusCode)\n\t\t\t\treturn\n\
+    \t\t\t}\n\t\t}\n\n\t\treturn http.HandlerFunc(fn)\n\t}\n}\n\n// token represents\
+    \ a request that is being processed.\ntype token struct{}\n\n// throttler limits\
+    \ number of currently processed requests at a time.\ntype throttler struct {\n\
+    \ttokens         chan token\n\tbacklogTokens  chan token\n\tretryAfterFn   func(ctxDone\
+    \ bool) time.Duration\n\tbacklogTimeout time.Duration\n\tstatusCode     int\n\
+    }\n\n// setRetryAfterHeaderIfNeeded sets Retry-After HTTP header if corresponding\
+    \ retryAfterFn option of throttler is initialized.\nfunc (t throttler) setRetryAfterHeaderIfNeeded(w\
+    \ http.ResponseWriter, ctxDone bool) {\n\tif t.retryAfterFn == nil {\n\t\treturn\n\
+    \t}\n\tw.Header().Set(\"Retry-After\", strconv.Itoa(int(t.retryAfterFn(ctxDone).Seconds())))\n\
+    }\n\n### Source File Dependency Files Content\n### Dependency File: empty.go\n\
+    \nOutput the complete test file, code only, no explanations.\n### Time\nCurrent\
+    \ time: 2025-03-23 22:50:06\n"
+  role: user

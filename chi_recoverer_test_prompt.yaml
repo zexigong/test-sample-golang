@@ -1,0 +1,80 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: chi\nTest File Path: chi\\recoverer_test.go\\\
+    recoverer_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: chi\\recoverer_test.go\\source_files\\\
+    recoverer.go\npackage middleware\n\n// The original work was derived from Goji's\
+    \ middleware, source:\n// https://github.com/zenazn/goji/tree/master/web/middleware\n\
+    \nimport (\n\t\"bytes\"\n\t\"errors\"\n\t\"fmt\"\n\t\"io\"\n\t\"net/http\"\n\t\
+    \"os\"\n\t\"runtime/debug\"\n\t\"strings\"\n)\n\n// Recoverer is a middleware\
+    \ that recovers from panics, logs the panic (and a\n// backtrace), and returns\
+    \ a HTTP 500 (Internal Server Error) status if\n// possible. Recoverer prints\
+    \ a request ID if one is provided.\n//\n// Alternatively, look at https://github.com/go-chi/httplog\
+    \ middleware pkgs.\nfunc Recoverer(next http.Handler) http.Handler {\n\tfn :=\
+    \ func(w http.ResponseWriter, r *http.Request) {\n\t\tdefer func() {\n\t\t\tif\
+    \ rvr := recover(); rvr != nil {\n\t\t\t\tif rvr == http.ErrAbortHandler {\n\t\
+    \t\t\t\t// we don't recover http.ErrAbortHandler so the response\n\t\t\t\t\t//\
+    \ to the client is aborted, this should not be logged\n\t\t\t\t\tpanic(rvr)\n\t\
+    \t\t\t}\n\n\t\t\t\tlogEntry := GetLogEntry(r)\n\t\t\t\tif logEntry != nil {\n\t\
+    \t\t\t\tlogEntry.Panic(rvr, debug.Stack())\n\t\t\t\t} else {\n\t\t\t\t\tPrintPrettyStack(rvr)\n\
+    \t\t\t\t}\n\n\t\t\t\tif r.Header.Get(\"Connection\") != \"Upgrade\" {\n\t\t\t\t\
+    \tw.WriteHeader(http.StatusInternalServerError)\n\t\t\t\t}\n\t\t\t}\n\t\t}()\n\
+    \n\t\tnext.ServeHTTP(w, r)\n\t}\n\n\treturn http.HandlerFunc(fn)\n}\n\n// for\
+    \ ability to test the PrintPrettyStack function\nvar recovererErrorWriter io.Writer\
+    \ = os.Stderr\n\nfunc PrintPrettyStack(rvr interface{}) {\n\tdebugStack := debug.Stack()\n\
+    \ts := prettyStack{}\n\tout, err := s.parse(debugStack, rvr)\n\tif err == nil\
+    \ {\n\t\trecovererErrorWriter.Write(out)\n\t} else {\n\t\t// print stdlib output\
+    \ as a fallback\n\t\tos.Stderr.Write(debugStack)\n\t}\n}\n\ntype prettyStack struct\
+    \ {\n}\n\nfunc (s prettyStack) parse(debugStack []byte, rvr interface{}) ([]byte,\
+    \ error) {\n\tvar err error\n\tuseColor := true\n\tbuf := &bytes.Buffer{}\n\n\t\
+    cW(buf, false, bRed, \"\\n\")\n\tcW(buf, useColor, bCyan, \" panic: \")\n\tcW(buf,\
+    \ useColor, bBlue, \"%v\", rvr)\n\tcW(buf, false, bWhite, \"\\n \\n\")\n\n\t//\
+    \ process debug stack info\n\tstack := strings.Split(string(debugStack), \"\\\
+    n\")\n\tlines := []string{}\n\n\t// locate panic line, as we may have nested panics\n\
+    \tfor i := len(stack) - 1; i > 0; i-- {\n\t\tlines = append(lines, stack[i])\n\
+    \t\tif strings.HasPrefix(stack[i], \"panic(\") {\n\t\t\tlines = lines[0 : len(lines)-2]\
+    \ // remove boilerplate\n\t\t\tbreak\n\t\t}\n\t}\n\n\t// reverse\n\tfor i := len(lines)/2\
+    \ - 1; i >= 0; i-- {\n\t\topp := len(lines) - 1 - i\n\t\tlines[i], lines[opp]\
+    \ = lines[opp], lines[i]\n\t}\n\n\t// decorate\n\tfor i, line := range lines {\n\
+    \t\tlines[i], err = s.decorateLine(line, useColor, i)\n\t\tif err != nil {\n\t\
+    \t\treturn nil, err\n\t\t}\n\t}\n\n\tfor _, l := range lines {\n\t\tfmt.Fprintf(buf,\
+    \ \"%s\", l)\n\t}\n\treturn buf.Bytes(), nil\n}\n\nfunc (s prettyStack) decorateLine(line\
+    \ string, useColor bool, num int) (string, error) {\n\tline = strings.TrimSpace(line)\n\
+    \tif strings.HasPrefix(line, \"\\t\") || strings.Contains(line, \".go:\") {\n\t\
+    \treturn s.decorateSourceLine(line, useColor, num)\n\t}\n\tif strings.HasSuffix(line,\
+    \ \")\") {\n\t\treturn s.decorateFuncCallLine(line, useColor, num)\n\t}\n\tif\
+    \ strings.HasPrefix(line, \"\\t\") {\n\t\treturn strings.Replace(line, \"\\t\"\
+    , \"      \", 1), nil\n\t}\n\treturn fmt.Sprintf(\"    %s\\n\", line), nil\n}\n\
+    \nfunc (s prettyStack) decorateFuncCallLine(line string, useColor bool, num int)\
+    \ (string, error) {\n\tidx := strings.LastIndex(line, \"(\")\n\tif idx < 0 {\n\
+    \t\treturn \"\", errors.New(\"not a func call line\")\n\t}\n\n\tbuf := &bytes.Buffer{}\n\
+    \tpkg := line[0:idx]\n\t// addr := line[idx:]\n\tmethod := \"\"\n\n\tif idx :=\
+    \ strings.LastIndex(pkg, string(os.PathSeparator)); idx < 0 {\n\t\tif idx := strings.Index(pkg,\
+    \ \".\"); idx > 0 {\n\t\t\tmethod = pkg[idx:]\n\t\t\tpkg = pkg[0:idx]\n\t\t}\n\
+    \t} else {\n\t\tmethod = pkg[idx+1:]\n\t\tpkg = pkg[0 : idx+1]\n\t\tif idx :=\
+    \ strings.Index(method, \".\"); idx > 0 {\n\t\t\tpkg += method[0:idx]\n\t\t\t\
+    method = method[idx:]\n\t\t}\n\t}\n\tpkgColor := nYellow\n\tmethodColor := bGreen\n\
+    \n\tif num == 0 {\n\t\tcW(buf, useColor, bRed, \" -> \")\n\t\tpkgColor = bMagenta\n\
+    \t\tmethodColor = bRed\n\t} else {\n\t\tcW(buf, useColor, bWhite, \"    \")\n\t\
+    }\n\tcW(buf, useColor, pkgColor, \"%s\", pkg)\n\tcW(buf, useColor, methodColor,\
+    \ \"%s\\n\", method)\n\t// cW(buf, useColor, nBlack, \"%s\", addr)\n\treturn buf.String(),\
+    \ nil\n}\n\nfunc (s prettyStack) decorateSourceLine(line string, useColor bool,\
+    \ num int) (string, error) {\n\tidx := strings.LastIndex(line, \".go:\")\n\tif\
+    \ idx < 0 {\n\t\treturn \"\", errors.New(\"not a source line\")\n\t}\n\n\tbuf\
+    \ := &bytes.Buffer{}\n\tpath := line[0 : idx+3]\n\tlineno := line[idx+3:]\n\n\t\
+    idx = strings.LastIndex(path, string(os.PathSeparator))\n\tdir := path[0 : idx+1]\n\
+    \tfile := path[idx+1:]\n\n\tidx = strings.Index(lineno, \" \")\n\tif idx > 0 {\n\
+    \t\tlineno = lineno[0:idx]\n\t}\n\tfileColor := bCyan\n\tlineColor := bGreen\n\
+    \n\tif num == 1 {\n\t\tcW(buf, useColor, bRed, \" ->   \")\n\t\tfileColor = bRed\n\
+    \t\tlineColor = bMagenta\n\t} else {\n\t\tcW(buf, false, bWhite, \"      \")\n\
+    \t}\n\tcW(buf, useColor, bWhite, \"%s\", dir)\n\tcW(buf, useColor, fileColor,\
+    \ \"%s\", file)\n\tcW(buf, useColor, lineColor, \"%s\", lineno)\n\tif num == 1\
+    \ {\n\t\tcW(buf, false, bWhite, \"\\n\")\n\t}\n\tcW(buf, false, bWhite, \"\\n\"\
+    )\n\n\treturn buf.String(), nil\n}\n\n### Source File Dependency Files Content\n\
+    ### Dependency File: empty.go\n\nOutput the complete test file, code only, no\
+    \ explanations.\n### Time\nCurrent time: 2025-03-23 22:49:31\n"
+  role: user

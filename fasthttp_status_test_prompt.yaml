@@ -1,0 +1,115 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: fasthttp\nTest File Path: fasthttp\\status_test.go\\\
+    status_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: fasthttp\\status_test.go\\source_files\\\
+    status.go\npackage fasthttp\n\nimport (\n\t\"strconv\"\n)\n\nconst (\n\tstatusMessageMin\
+    \ = 100\n\tstatusMessageMax = 511\n)\n\n// HTTP status codes were stolen from\
+    \ net/http.\nconst (\n\tStatusContinue           = 100 // RFC 7231, 6.2.1\n\t\
+    StatusSwitchingProtocols = 101 // RFC 7231, 6.2.2\n\tStatusProcessing        \
+    \ = 102 // RFC 2518, 10.1\n\tStatusEarlyHints         = 103 // RFC 8297\n\n\t\
+    StatusOK                   = 200 // RFC 7231, 6.3.1\n\tStatusCreated         \
+    \     = 201 // RFC 7231, 6.3.2\n\tStatusAccepted             = 202 // RFC 7231,\
+    \ 6.3.3\n\tStatusNonAuthoritativeInfo = 203 // RFC 7231, 6.3.4\n\tStatusNoContent\
+    \            = 204 // RFC 7231, 6.3.5\n\tStatusResetContent         = 205 // RFC\
+    \ 7231, 6.3.6\n\tStatusPartialContent       = 206 // RFC 7233, 4.1\n\tStatusMultiStatus\
+    \          = 207 // RFC 4918, 11.1\n\tStatusAlreadyReported      = 208 // RFC\
+    \ 5842, 7.1\n\tStatusIMUsed               = 226 // RFC 3229, 10.4.1\n\n\tStatusMultipleChoices\
+    \   = 300 // RFC 7231, 6.4.1\n\tStatusMovedPermanently  = 301 // RFC 7231, 6.4.2\n\
+    \tStatusFound             = 302 // RFC 7231, 6.4.3\n\tStatusSeeOther         \
+    \ = 303 // RFC 7231, 6.4.4\n\tStatusNotModified       = 304 // RFC 7232, 4.1\n\
+    \tStatusUseProxy          = 305 // RFC 7231, 6.4.5\n\t_                      \
+    \ = 306 // RFC 7231, 6.4.6 (Unused)\n\tStatusTemporaryRedirect = 307 // RFC 7231,\
+    \ 6.4.7\n\tStatusPermanentRedirect = 308 // RFC 7538, 3\n\n\tStatusBadRequest\
+    \                   = 400 // RFC 7231, 6.5.1\n\tStatusUnauthorized           \
+    \      = 401 // RFC 7235, 3.1\n\tStatusPaymentRequired              = 402 // RFC\
+    \ 7231, 6.5.2\n\tStatusForbidden                    = 403 // RFC 7231, 6.5.3\n\
+    \tStatusNotFound                     = 404 // RFC 7231, 6.5.4\n\tStatusMethodNotAllowed\
+    \             = 405 // RFC 7231, 6.5.5\n\tStatusNotAcceptable                =\
+    \ 406 // RFC 7231, 6.5.6\n\tStatusProxyAuthRequired            = 407 // RFC 7235,\
+    \ 3.2\n\tStatusRequestTimeout               = 408 // RFC 7231, 6.5.7\n\tStatusConflict\
+    \                     = 409 // RFC 7231, 6.5.8\n\tStatusGone                 \
+    \        = 410 // RFC 7231, 6.5.9\n\tStatusLengthRequired               = 411\
+    \ // RFC 7231, 6.5.10\n\tStatusPreconditionFailed           = 412 // RFC 7232,\
+    \ 4.2\n\tStatusRequestEntityTooLarge        = 413 // RFC 7231, 6.5.11\n\tStatusRequestURITooLong\
+    \            = 414 // RFC 7231, 6.5.12\n\tStatusUnsupportedMediaType         =\
+    \ 415 // RFC 7231, 6.5.13\n\tStatusRequestedRangeNotSatisfiable = 416 // RFC 7233,\
+    \ 4.4\n\tStatusExpectationFailed            = 417 // RFC 7231, 6.5.14\n\tStatusTeapot\
+    \                       = 418 // RFC 7168, 2.3.3\n\tStatusMisdirectedRequest \
+    \          = 421 // RFC 7540, 9.1.2\n\tStatusUnprocessableEntity          = 422\
+    \ // RFC 4918, 11.2\n\tStatusLocked                       = 423 // RFC 4918, 11.3\n\
+    \tStatusFailedDependency             = 424 // RFC 4918, 11.4\n\tStatusUpgradeRequired\
+    \              = 426 // RFC 7231, 6.5.15\n\tStatusPreconditionRequired       \
+    \  = 428 // RFC 6585, 3\n\tStatusTooManyRequests              = 429 // RFC 6585,\
+    \ 4\n\tStatusRequestHeaderFieldsTooLarge  = 431 // RFC 6585, 5\n\tStatusUnavailableForLegalReasons\
+    \   = 451 // RFC 7725, 3\n\n\tStatusInternalServerError           = 500 // RFC\
+    \ 7231, 6.6.1\n\tStatusNotImplemented                = 501 // RFC 7231, 6.6.2\n\
+    \tStatusBadGateway                    = 502 // RFC 7231, 6.6.3\n\tStatusServiceUnavailable\
+    \            = 503 // RFC 7231, 6.6.4\n\tStatusGatewayTimeout                =\
+    \ 504 // RFC 7231, 6.6.5\n\tStatusHTTPVersionNotSupported       = 505 // RFC 7231,\
+    \ 6.6.6\n\tStatusVariantAlsoNegotiates         = 506 // RFC 2295, 8.1\n\tStatusInsufficientStorage\
+    \           = 507 // RFC 4918, 11.5\n\tStatusLoopDetected                  = 508\
+    \ // RFC 5842, 7.2\n\tStatusNotExtended                   = 510 // RFC 2774, 7\n\
+    \tStatusNetworkAuthenticationRequired = 511 // RFC 6585, 6\n)\n\nvar (\n\tunknownStatusCode\
+    \ = \"Unknown Status Code\"\n\n\tstatusMessages = []string{\n\t\tStatusContinue:\
+    \           \"Continue\",\n\t\tStatusSwitchingProtocols: \"Switching Protocols\"\
+    ,\n\t\tStatusProcessing:         \"Processing\",\n\t\tStatusEarlyHints:      \
+    \   \"Early Hints\",\n\n\t\tStatusOK:                   \"OK\",\n\t\tStatusCreated:\
+    \              \"Created\",\n\t\tStatusAccepted:             \"Accepted\",\n\t\
+    \tStatusNonAuthoritativeInfo: \"Non-Authoritative Information\",\n\t\tStatusNoContent:\
+    \            \"No Content\",\n\t\tStatusResetContent:         \"Reset Content\"\
+    ,\n\t\tStatusPartialContent:       \"Partial Content\",\n\t\tStatusMultiStatus:\
+    \          \"Multi-Status\",\n\t\tStatusAlreadyReported:      \"Already Reported\"\
+    ,\n\t\tStatusIMUsed:               \"IM Used\",\n\n\t\tStatusMultipleChoices:\
+    \   \"Multiple Choices\",\n\t\tStatusMovedPermanently:  \"Moved Permanently\"\
+    ,\n\t\tStatusFound:             \"Found\",\n\t\tStatusSeeOther:          \"See\
+    \ Other\",\n\t\tStatusNotModified:       \"Not Modified\",\n\t\tStatusUseProxy:\
+    \          \"Use Proxy\",\n\t\tStatusTemporaryRedirect: \"Temporary Redirect\"\
+    ,\n\t\tStatusPermanentRedirect: \"Permanent Redirect\",\n\n\t\tStatusBadRequest:\
+    \                   \"Bad Request\",\n\t\tStatusUnauthorized:                \
+    \ \"Unauthorized\",\n\t\tStatusPaymentRequired:              \"Payment Required\"\
+    ,\n\t\tStatusForbidden:                    \"Forbidden\",\n\t\tStatusNotFound:\
+    \                     \"Not Found\",\n\t\tStatusMethodNotAllowed:            \
+    \ \"Method Not Allowed\",\n\t\tStatusNotAcceptable:                \"Not Acceptable\"\
+    ,\n\t\tStatusProxyAuthRequired:            \"Proxy Authentication Required\",\n\
+    \t\tStatusRequestTimeout:               \"Request Timeout\",\n\t\tStatusConflict:\
+    \                     \"Conflict\",\n\t\tStatusGone:                         \"\
+    Gone\",\n\t\tStatusLengthRequired:               \"Length Required\",\n\t\tStatusPreconditionFailed:\
+    \           \"Precondition Failed\",\n\t\tStatusRequestEntityTooLarge:       \
+    \ \"Request Entity Too Large\",\n\t\tStatusRequestURITooLong:            \"Request\
+    \ URI Too Long\",\n\t\tStatusUnsupportedMediaType:         \"Unsupported Media\
+    \ Type\",\n\t\tStatusRequestedRangeNotSatisfiable: \"Requested Range Not Satisfiable\"\
+    ,\n\t\tStatusExpectationFailed:            \"Expectation Failed\",\n\t\tStatusTeapot:\
+    \                       \"I'm a teapot\",\n\t\tStatusMisdirectedRequest:     \
+    \      \"Misdirected Request\",\n\t\tStatusUnprocessableEntity:          \"Unprocessable\
+    \ Entity\",\n\t\tStatusLocked:                       \"Locked\",\n\t\tStatusFailedDependency:\
+    \             \"Failed Dependency\",\n\t\tStatusUpgradeRequired:             \
+    \ \"Upgrade Required\",\n\t\tStatusPreconditionRequired:         \"Precondition\
+    \ Required\",\n\t\tStatusTooManyRequests:              \"Too Many Requests\",\n\
+    \t\tStatusRequestHeaderFieldsTooLarge:  \"Request Header Fields Too Large\",\n\
+    \t\tStatusUnavailableForLegalReasons:   \"Unavailable For Legal Reasons\",\n\n\
+    \t\tStatusInternalServerError:           \"Internal Server Error\",\n\t\tStatusNotImplemented:\
+    \                \"Not Implemented\",\n\t\tStatusBadGateway:                 \
+    \   \"Bad Gateway\",\n\t\tStatusServiceUnavailable:            \"Service Unavailable\"\
+    ,\n\t\tStatusGatewayTimeout:                \"Gateway Timeout\",\n\t\tStatusHTTPVersionNotSupported:\
+    \       \"HTTP Version Not Supported\",\n\t\tStatusVariantAlsoNegotiates:    \
+    \     \"Variant Also Negotiates\",\n\t\tStatusInsufficientStorage:           \"\
+    Insufficient Storage\",\n\t\tStatusLoopDetected:                  \"Loop Detected\"\
+    ,\n\t\tStatusNotExtended:                   \"Not Extended\",\n\t\tStatusNetworkAuthenticationRequired:\
+    \ \"Network Authentication Required\",\n\t}\n)\n\n// StatusMessage returns HTTP\
+    \ status message for the given status code.\nfunc StatusMessage(statusCode int)\
+    \ string {\n\tif statusCode < statusMessageMin || statusCode > statusMessageMax\
+    \ {\n\t\treturn unknownStatusCode\n\t}\n\n\tif s := statusMessages[statusCode];\
+    \ s != \"\" {\n\t\treturn s\n\t}\n\treturn unknownStatusCode\n}\n\nfunc formatStatusLine(dst,\
+    \ protocol []byte, statusCode int, statusText []byte) []byte {\n\tdst = append(dst,\
+    \ protocol...)\n\tdst = append(dst, ' ')\n\tdst = strconv.AppendInt(dst, int64(statusCode),\
+    \ 10)\n\tdst = append(dst, ' ')\n\tif len(statusText) == 0 {\n\t\tdst = append(dst,\
+    \ s2b(StatusMessage(statusCode))...)\n\t} else {\n\t\tdst = append(dst, statusText...)\n\
+    \t}\n\treturn append(dst, strCRLF...)\n}\n\n### Source File Dependency Files Content\n\
+    ### Dependency File: empty.go\n\nOutput the complete test file, code only, no\
+    \ explanations.\n### Time\nCurrent time: 2025-03-23 23:29:56\n"
+  role: user

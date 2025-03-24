@@ -1,0 +1,48 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: hugo\nTest File Path: hugo\\hashing_fs_test.go\\\
+    hashing_fs_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: hugo\\hashing_fs_test.go\\source_files\\\
+    hashing_fs.go\n// Copyright 2019 The Hugo Authors. All rights reserved.\n//\n\
+    // Licensed under the Apache License, Version 2.0 (the \"License\");\n// you may\
+    \ not use this file except in compliance with the License.\n// You may obtain\
+    \ a copy of the License at\n// http://www.apache.org/licenses/LICENSE-2.0\n//\n\
+    // Unless required by applicable law or agreed to in writing, software\n// distributed\
+    \ under the License is distributed on an \"AS IS\" BASIS,\n// WITHOUT WARRANTIES\
+    \ OR CONDITIONS OF ANY KIND, either express or implied.\n// See the License for\
+    \ the specific language governing permissions and\n// limitations under the License.\n\
+    \npackage hugofs\n\nimport (\n\t\"hash\"\n\t\"os\"\n\n\t\"github.com/cespare/xxhash/v2\"\
+    \n\t\"github.com/spf13/afero\"\n)\n\nvar (\n\t_ afero.Fs            = (*hashingFs)(nil)\n\
+    \t_ FilesystemUnwrapper = (*hashingFs)(nil)\n)\n\n// FileHashReceiver will receive\
+    \ the filename an the content's MD5 sum on file close.\ntype FileHashReceiver\
+    \ interface {\n\tOnFileClose(name string, checksum uint64)\n}\n\ntype hashingFs\
+    \ struct {\n\tafero.Fs\n\thashReceiver FileHashReceiver\n}\n\n// NewHashingFs\
+    \ creates a new filesystem that will receive MD5 checksums of\n// any written\
+    \ file content on Close. Note that this is probably not a good\n// idea for \"\
+    full build\" situations, but when doing fast render mode, the amount\n// of files\
+    \ published is low, and it would be really nice to know exactly which\n// of these\
+    \ files where actually changed.\n// Note that this will only work for file operations\
+    \ that use the io.Writer\n// to write content to file, but that is fine for the\
+    \ \"publish content\" use case.\nfunc NewHashingFs(delegate afero.Fs, hashReceiver\
+    \ FileHashReceiver) afero.Fs {\n\treturn &hashingFs{Fs: delegate, hashReceiver:\
+    \ hashReceiver}\n}\n\nfunc (fs *hashingFs) UnwrapFilesystem() afero.Fs {\n\treturn\
+    \ fs.Fs\n}\n\nfunc (fs *hashingFs) Create(name string) (afero.File, error) {\n\
+    \tf, err := fs.Fs.Create(name)\n\tif err == nil {\n\t\tf = fs.wrapFile(f)\n\t\
+    }\n\treturn f, err\n}\n\nfunc (fs *hashingFs) OpenFile(name string, flag int,\
+    \ perm os.FileMode) (afero.File, error) {\n\tf, err := fs.Fs.OpenFile(name, flag,\
+    \ perm)\n\tif err == nil && isWrite(flag) {\n\t\tf = fs.wrapFile(f)\n\t}\n\treturn\
+    \ f, err\n}\n\nfunc (fs *hashingFs) wrapFile(f afero.File) afero.File {\n\treturn\
+    \ &hashingFile{File: f, h: xxhash.New(), hashReceiver: fs.hashReceiver}\n}\n\n\
+    func (fs *hashingFs) Name() string {\n\treturn \"hashingFs\"\n}\n\ntype hashingFile\
+    \ struct {\n\thashReceiver FileHashReceiver\n\th            hash.Hash64\n\tafero.File\n\
+    }\n\nfunc (h *hashingFile) Write(p []byte) (n int, err error) {\n\tn, err = h.File.Write(p)\n\
+    \tif err != nil {\n\t\treturn\n\t}\n\treturn h.h.Write(p)\n}\n\nfunc (h *hashingFile)\
+    \ Close() error {\n\th.hashReceiver.OnFileClose(h.Name(), h.h.Sum64())\n\treturn\
+    \ h.File.Close()\n}\n\n### Source File Dependency Files Content\n### Dependency\
+    \ File: empty.go\n\nOutput the complete test file, code only, no explanations.\n\
+    ### Time\nCurrent time: 2025-03-23 23:56:39\n"
+  role: user

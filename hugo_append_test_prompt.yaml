@@ -1,0 +1,65 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: hugo\nTest File Path: hugo\\append_test.go\\\
+    append_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: hugo\\append_test.go\\source_files\\\
+    append.go\n// Copyright 2019 The Hugo Authors. All rights reserved.\n//\n// Licensed\
+    \ under the Apache License, Version 2.0 (the \"License\");\n// you may not use\
+    \ this file except in compliance with the License.\n// You may obtain a copy of\
+    \ the License at\n// http://www.apache.org/licenses/LICENSE-2.0\n//\n// Unless\
+    \ required by applicable law or agreed to in writing, software\n// distributed\
+    \ under the License is distributed on an \"AS IS\" BASIS,\n// WITHOUT WARRANTIES\
+    \ OR CONDITIONS OF ANY KIND, either express or implied.\n// See the License for\
+    \ the specific language governing permissions and\n// limitations under the License.\n\
+    \npackage collections\n\nimport (\n\t\"fmt\"\n\t\"reflect\"\n)\n\n// Append appends\
+    \ from to a slice to and returns the resulting slice.\n// If length of from is\
+    \ one and the only element is a slice of same type as to,\n// it will be appended.\n\
+    func Append(to any, from ...any) (any, error) {\n\tif len(from) == 0 {\n\t\treturn\
+    \ to, nil\n\t}\n\ttov, toIsNil := indirect(reflect.ValueOf(to))\n\n\ttoIsNil =\
+    \ toIsNil || to == nil\n\tvar tot reflect.Type\n\n\tif !toIsNil {\n\t\tif tov.Kind()\
+    \ == reflect.Slice {\n\t\t\t// Create a copy of tov, so we don't modify the original.\n\
+    \t\t\tc := reflect.MakeSlice(tov.Type(), tov.Len(), tov.Len()+len(from))\n\t\t\
+    \treflect.Copy(c, tov)\n\t\t\ttov = c\n\t\t}\n\n\t\tif tov.Kind() != reflect.Slice\
+    \ {\n\t\t\treturn nil, fmt.Errorf(\"expected a slice, got %T\", to)\n\t\t}\n\n\
+    \t\ttot = tov.Type().Elem()\n\t\tif tot.Kind() == reflect.Slice {\n\t\t\ttotvt\
+    \ := tot.Elem()\n\t\t\tfromvs := make([]reflect.Value, len(from))\n\t\t\tfor i,\
+    \ f := range from {\n\t\t\t\tfromv := reflect.ValueOf(f)\n\t\t\t\tfromt := fromv.Type()\n\
+    \t\t\t\tif fromt.Kind() == reflect.Slice {\n\t\t\t\t\tfromt = fromt.Elem()\n\t\
+    \t\t\t}\n\t\t\t\tif totvt != fromt {\n\t\t\t\t\treturn nil, fmt.Errorf(\"cannot\
+    \ append slice of %s to slice of %s\", fromt, totvt)\n\t\t\t\t} else {\n\t\t\t\
+    \t\tfromvs[i] = fromv\n\t\t\t\t}\n\t\t\t}\n\t\t\treturn reflect.Append(tov, fromvs...).Interface(),\
+    \ nil\n\n\t\t}\n\n\t\ttoIsNil = tov.Len() == 0\n\n\t\tif len(from) == 1 {\n\t\t\
+    \tfromv := reflect.ValueOf(from[0])\n\t\t\tif !fromv.IsValid() {\n\t\t\t\t// from[0]\
+    \ is nil\n\t\t\t\treturn appendToInterfaceSliceFromValues(tov, fromv)\n\t\t\t\
+    }\n\t\t\tfromt := fromv.Type()\n\t\t\tif fromt.Kind() == reflect.Slice {\n\t\t\
+    \t\tfromt = fromt.Elem()\n\t\t\t}\n\t\t\tif fromv.Kind() == reflect.Slice {\n\t\
+    \t\t\tif toIsNil {\n\t\t\t\t\t// If we get nil []string, we just return the []string\n\
+    \t\t\t\t\treturn from[0], nil\n\t\t\t\t}\n\n\t\t\t\t// If we get []string []string,\
+    \ we append the from slice to to\n\t\t\t\tif tot == fromt {\n\t\t\t\t\treturn\
+    \ reflect.AppendSlice(tov, fromv).Interface(), nil\n\t\t\t\t} else if !fromt.AssignableTo(tot)\
+    \ {\n\t\t\t\t\t// Fall back to a []interface{} slice.\n\t\t\t\t\treturn appendToInterfaceSliceFromValues(tov,\
+    \ fromv)\n\t\t\t\t}\n\n\t\t\t}\n\t\t}\n\t}\n\n\tif toIsNil {\n\t\treturn Slice(from...),\
+    \ nil\n\t}\n\n\tfor _, f := range from {\n\t\tfv := reflect.ValueOf(f)\n\t\tif\
+    \ !fv.IsValid() || !fv.Type().AssignableTo(tot) {\n\t\t\t// Fall back to a []interface{}\
+    \ slice.\n\t\t\ttov, _ := indirect(reflect.ValueOf(to))\n\t\t\treturn appendToInterfaceSlice(tov,\
+    \ from...)\n\t\t}\n\t\ttov = reflect.Append(tov, fv)\n\t}\n\n\treturn tov.Interface(),\
+    \ nil\n}\n\nfunc appendToInterfaceSliceFromValues(slice1, slice2 reflect.Value)\
+    \ ([]any, error) {\n\tvar tos []any\n\n\tfor _, slice := range []reflect.Value{slice1,\
+    \ slice2} {\n\t\tif !slice.IsValid() {\n\t\t\ttos = append(tos, nil)\n\t\t\tcontinue\n\
+    \t\t}\n\t\tfor i := 0; i < slice.Len(); i++ {\n\t\t\ttos = append(tos, slice.Index(i).Interface())\n\
+    \t\t}\n\t}\n\n\treturn tos, nil\n}\n\nfunc appendToInterfaceSlice(tov reflect.Value,\
+    \ from ...any) ([]any, error) {\n\tvar tos []any\n\n\tfor i := 0; i < tov.Len();\
+    \ i++ {\n\t\ttos = append(tos, tov.Index(i).Interface())\n\t}\n\n\ttos = append(tos,\
+    \ from...)\n\n\treturn tos, nil\n}\n\n// indirect is borrowed from the Go stdlib:\
+    \ 'text/template/exec.go'\n// TODO(bep) consolidate\nfunc indirect(v reflect.Value)\
+    \ (rv reflect.Value, isNil bool) {\n\tfor ; v.Kind() == reflect.Ptr || v.Kind()\
+    \ == reflect.Interface; v = v.Elem() {\n\t\tif v.IsNil() {\n\t\t\treturn v, true\n\
+    \t\t}\n\t\tif v.Kind() == reflect.Interface && v.NumMethod() > 0 {\n\t\t\tbreak\n\
+    \t\t}\n\t}\n\treturn v, false\n}\n\n### Source File Dependency Files Content\n\
+    ### Dependency File: empty.go\n\nOutput the complete test file, code only, no\
+    \ explanations.\n### Time\nCurrent time: 2025-03-23 23:54:23\n"
+  role: user

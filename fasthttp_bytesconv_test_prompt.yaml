@@ -1,0 +1,103 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: fasthttp\nTest File Path: fasthttp\\bytesconv_test.go\\\
+    bytesconv_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: fasthttp\\bytesconv_test.go\\source_files\\\
+    bytesconv.go\n//go:generate go run bytesconv_table_gen.go\n\npackage fasthttp\n\
+    \nimport (\n\t\"bufio\"\n\t\"bytes\"\n\t\"errors\"\n\t\"fmt\"\n\t\"io\"\n\t\"\
+    net\"\n\t\"strconv\"\n\t\"sync\"\n\t\"time\"\n)\n\n// AppendHTMLEscape appends\
+    \ html-escaped s to dst and returns the extended dst.\nfunc AppendHTMLEscape(dst\
+    \ []byte, s string) []byte {\n\tvar (\n\t\tprev int\n\t\tsub  string\n\t)\n\n\t\
+    for i, n := 0, len(s); i < n; i++ {\n\t\tsub = \"\"\n\t\tswitch s[i] {\n\t\tcase\
+    \ '&':\n\t\t\tsub = \"&amp;\"\n\t\tcase '<':\n\t\t\tsub = \"&lt;\"\n\t\tcase '>':\n\
+    \t\t\tsub = \"&gt;\"\n\t\tcase '\"':\n\t\t\tsub = \"&#34;\" // \"&#34;\" is shorter\
+    \ than \"&quot;\".\n\t\tcase '\\'':\n\t\t\tsub = \"&#39;\" // \"&#39;\" is shorter\
+    \ than \"&apos;\" and apos was not in HTML until HTML5.\n\t\t}\n\t\tif sub !=\
+    \ \"\" {\n\t\t\tdst = append(dst, s[prev:i]...)\n\t\t\tdst = append(dst, sub...)\n\
+    \t\t\tprev = i + 1\n\t\t}\n\t}\n\treturn append(dst, s[prev:]...)\n}\n\n// AppendHTMLEscapeBytes\
+    \ appends html-escaped s to dst and returns\n// the extended dst.\nfunc AppendHTMLEscapeBytes(dst,\
+    \ s []byte) []byte {\n\treturn AppendHTMLEscape(dst, b2s(s))\n}\n\n// AppendIPv4\
+    \ appends string representation of the given ip v4 to dst\n// and returns the\
+    \ extended dst.\nfunc AppendIPv4(dst []byte, ip net.IP) []byte {\n\tip = ip.To4()\n\
+    \tif ip == nil {\n\t\treturn append(dst, \"non-v4 ip passed to AppendIPv4\"...)\n\
+    \t}\n\n\tdst = AppendUint(dst, int(ip[0]))\n\tfor i := 1; i < 4; i++ {\n\t\tdst\
+    \ = append(dst, '.')\n\t\tdst = AppendUint(dst, int(ip[i]))\n\t}\n\treturn dst\n\
+    }\n\nvar errEmptyIPStr = errors.New(\"empty ip address string\")\n\n// ParseIPv4\
+    \ parses ip address from ipStr into dst and returns the extended dst.\nfunc ParseIPv4(dst\
+    \ net.IP, ipStr []byte) (net.IP, error) {\n\tif len(ipStr) == 0 {\n\t\treturn\
+    \ dst, errEmptyIPStr\n\t}\n\tif len(dst) < net.IPv4len || len(dst) > net.IPv4len\
+    \ {\n\t\tdst = make([]byte, net.IPv4len)\n\t}\n\tcopy(dst, net.IPv4zero)\n\tdst\
+    \ = dst.To4() // dst is always non-nil here\n\n\tb := ipStr\n\tfor i := 0; i <\
+    \ 3; i++ {\n\t\tn := bytes.IndexByte(b, '.')\n\t\tif n < 0 {\n\t\t\treturn dst,\
+    \ fmt.Errorf(\"cannot find dot in ipStr %q\", ipStr)\n\t\t}\n\t\tv, err := ParseUint(b[:n])\n\
+    \t\tif err != nil {\n\t\t\treturn dst, fmt.Errorf(\"cannot parse ipStr %q: %w\"\
+    , ipStr, err)\n\t\t}\n\t\tif v > 255 {\n\t\t\treturn dst, fmt.Errorf(\"cannot\
+    \ parse ipStr %q: ip part cannot exceed 255: parsed %d\", ipStr, v)\n\t\t}\n\t\
+    \tdst[i] = byte(v)\n\t\tb = b[n+1:]\n\t}\n\tv, err := ParseUint(b)\n\tif err !=\
+    \ nil {\n\t\treturn dst, fmt.Errorf(\"cannot parse ipStr %q: %w\", ipStr, err)\n\
+    \t}\n\tif v > 255 {\n\t\treturn dst, fmt.Errorf(\"cannot parse ipStr %q: ip part\
+    \ cannot exceed 255: parsed %d\", ipStr, v)\n\t}\n\tdst[3] = byte(v)\n\n\treturn\
+    \ dst, nil\n}\n\n// AppendHTTPDate appends HTTP-compliant (RFC1123) representation\
+    \ of date\n// to dst and returns the extended dst.\nfunc AppendHTTPDate(dst []byte,\
+    \ date time.Time) []byte {\n\tdst = date.In(time.UTC).AppendFormat(dst, time.RFC1123)\n\
+    \tcopy(dst[len(dst)-3:], strGMT)\n\treturn dst\n}\n\n// ParseHTTPDate parses HTTP-compliant\
+    \ (RFC1123) date.\nfunc ParseHTTPDate(date []byte) (time.Time, error) {\n\treturn\
+    \ time.Parse(time.RFC1123, b2s(date))\n}\n\n// AppendUint appends n to dst and\
+    \ returns the extended dst.\nfunc AppendUint(dst []byte, n int) []byte {\n\tif\
+    \ n < 0 {\n\t\t// developer sanity-check\n\t\tpanic(\"BUG: int must be positive\"\
+    )\n\t}\n\n\treturn strconv.AppendUint(dst, uint64(n), 10)\n}\n\n// ParseUint parses\
+    \ uint from buf.\nfunc ParseUint(buf []byte) (int, error) {\n\tv, n, err := parseUintBuf(buf)\n\
+    \tif n != len(buf) {\n\t\treturn -1, errUnexpectedTrailingChar\n\t}\n\treturn\
+    \ v, err\n}\n\nvar (\n\terrEmptyInt               = errors.New(\"empty integer\"\
+    )\n\terrUnexpectedFirstChar    = errors.New(\"unexpected first char found. Expecting\
+    \ 0-9\")\n\terrUnexpectedTrailingChar = errors.New(\"unexpected trailing char\
+    \ found. Expecting 0-9\")\n\terrTooLongInt             = errors.New(\"too long\
+    \ int\")\n)\n\nfunc parseUintBuf(b []byte) (int, int, error) {\n\tn := len(b)\n\
+    \tif n == 0 {\n\t\treturn -1, 0, errEmptyInt\n\t}\n\tv := 0\n\tfor i := 0; i <\
+    \ n; i++ {\n\t\tc := b[i]\n\t\tk := c - '0'\n\t\tif k > 9 {\n\t\t\tif i == 0 {\n\
+    \t\t\t\treturn -1, i, errUnexpectedFirstChar\n\t\t\t}\n\t\t\treturn v, i, nil\n\
+    \t\t}\n\t\tvNew := 10*v + int(k)\n\t\t// Test for overflow.\n\t\tif vNew < v {\n\
+    \t\t\treturn -1, i, errTooLongInt\n\t\t}\n\t\tv = vNew\n\t}\n\treturn v, n, nil\n\
+    }\n\n// ParseUfloat parses unsigned float from buf.\nfunc ParseUfloat(buf []byte)\
+    \ (float64, error) {\n\t// The implementation of parsing a float string is not\
+    \ easy.\n\t// We believe that the conservative approach is to call strconv.ParseFloat.\n\
+    \t// https://github.com/valyala/fasthttp/pull/1865\n\tres, err := strconv.ParseFloat(b2s(buf),\
+    \ 64)\n\tif res < 0 {\n\t\treturn -1, errors.New(\"negative input is invalid\"\
+    )\n\t}\n\tif err != nil {\n\t\treturn -1, err\n\t}\n\treturn res, err\n}\n\nvar\
+    \ (\n\terrEmptyHexNum    = errors.New(\"empty hex number\")\n\terrTooLargeHexNum\
+    \ = errors.New(\"too large hex number\")\n)\n\nfunc readHexInt(r *bufio.Reader)\
+    \ (int, error) {\n\tvar k, i, n int\n\tfor {\n\t\tc, err := r.ReadByte()\n\t\t\
+    if err != nil {\n\t\t\tif err == io.EOF && i > 0 {\n\t\t\t\treturn n, nil\n\t\t\
+    \t}\n\t\t\treturn -1, err\n\t\t}\n\t\tk = int(hex2intTable[c])\n\t\tif k == 16\
+    \ {\n\t\t\tif i == 0 {\n\t\t\t\treturn -1, errEmptyHexNum\n\t\t\t}\n\t\t\tif err\
+    \ := r.UnreadByte(); err != nil {\n\t\t\t\treturn -1, err\n\t\t\t}\n\t\t\treturn\
+    \ n, nil\n\t\t}\n\t\tif i >= maxHexIntChars {\n\t\t\treturn -1, errTooLargeHexNum\n\
+    \t\t}\n\t\tn = (n << 4) | k\n\t\ti++\n\t}\n}\n\nvar hexIntBufPool sync.Pool\n\n\
+    func writeHexInt(w *bufio.Writer, n int) error {\n\tif n < 0 {\n\t\t// developer\
+    \ sanity-check\n\t\tpanic(\"BUG: int must be positive\")\n\t}\n\n\tv := hexIntBufPool.Get()\n\
+    \tif v == nil {\n\t\tv = make([]byte, maxHexIntChars+1)\n\t}\n\tbuf := v.([]byte)\n\
+    \ti := len(buf) - 1\n\tfor {\n\t\tbuf[i] = lowerhex[n&0xf]\n\t\tn >>= 4\n\t\t\
+    if n == 0 {\n\t\t\tbreak\n\t\t}\n\t\ti--\n\t}\n\t_, err := w.Write(buf[i:])\n\t\
+    hexIntBufPool.Put(v)\n\treturn err\n}\n\nconst (\n\tupperhex = \"0123456789ABCDEF\"\
+    \n\tlowerhex = \"0123456789abcdef\"\n)\n\nfunc lowercaseBytes(b []byte) {\n\t\
+    for i := 0; i < len(b); i++ {\n\t\tp := &b[i]\n\t\t*p = toLowerTable[*p]\n\t}\n\
+    }\n\n// AppendUnquotedArg appends url-decoded src to dst and returns appended\
+    \ dst.\n//\n// dst may point to src. In this case src will be overwritten.\nfunc\
+    \ AppendUnquotedArg(dst, src []byte) []byte {\n\treturn decodeArgAppend(dst, src)\n\
+    }\n\n// AppendQuotedArg appends url-encoded src to dst and returns appended dst.\n\
+    func AppendQuotedArg(dst, src []byte) []byte {\n\tfor _, c := range src {\n\t\t\
+    switch {\n\t\tcase c == ' ':\n\t\t\tdst = append(dst, '+')\n\t\tcase quotedArgShouldEscapeTable[int(c)]\
+    \ != 0:\n\t\t\tdst = append(dst, '%', upperhex[c>>4], upperhex[c&0xf])\n\t\tdefault:\n\
+    \t\t\tdst = append(dst, c)\n\t\t}\n\t}\n\treturn dst\n}\n\nfunc appendQuotedPath(dst,\
+    \ src []byte) []byte {\n\t// Fix issue in https://github.com/golang/go/issues/11202\n\
+    \tif len(src) == 1 && src[0] == '*' {\n\t\treturn append(dst, '*')\n\t}\n\n\t\
+    for _, c := range src {\n\t\tif quotedPathShouldEscapeTable[int(c)] != 0 {\n\t\
+    \t\tdst = append(dst, '%', upperhex[c>>4], upperhex[c&0xf])\n\t\t} else {\n\t\t\
+    \tdst = append(dst, c)\n\t\t}\n\t}\n\treturn dst\n}\n\n### Source File Dependency\
+    \ Files Content\n### Dependency File: empty.go\n\nOutput the complete test file,\
+    \ code only, no explanations.\n### Time\nCurrent time: 2025-03-23 23:28:42\n"
+  role: user

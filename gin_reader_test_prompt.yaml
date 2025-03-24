@@ -1,0 +1,29 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: gin\nTest File Path: gin\\reader_test.go\\\
+    reader_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: gin\\reader_test.go\\source_files\\\
+    reader.go\n// Copyright 2018 Gin Core Team. All rights reserved.\n// Use of this\
+    \ source code is governed by a MIT style\n// license that can be found in the\
+    \ LICENSE file.\n\npackage render\n\nimport (\n\t\"io\"\n\t\"net/http\"\n\t\"\
+    strconv\"\n)\n\n// Reader contains the IO reader and its length, and custom ContentType\
+    \ and other headers.\ntype Reader struct {\n\tContentType   string\n\tContentLength\
+    \ int64\n\tReader        io.Reader\n\tHeaders       map[string]string\n}\n\n//\
+    \ Render (Reader) writes data with custom ContentType and headers.\nfunc (r Reader)\
+    \ Render(w http.ResponseWriter) (err error) {\n\tr.WriteContentType(w)\n\tif r.ContentLength\
+    \ >= 0 {\n\t\tif r.Headers == nil {\n\t\t\tr.Headers = map[string]string{}\n\t\
+    \t}\n\t\tr.Headers[\"Content-Length\"] = strconv.FormatInt(r.ContentLength, 10)\n\
+    \t}\n\tr.writeHeaders(w, r.Headers)\n\t_, err = io.Copy(w, r.Reader)\n\treturn\n\
+    }\n\n// WriteContentType (Reader) writes custom ContentType.\nfunc (r Reader)\
+    \ WriteContentType(w http.ResponseWriter) {\n\twriteContentType(w, []string{r.ContentType})\n\
+    }\n\n// writeHeaders writes custom Header.\nfunc (r Reader) writeHeaders(w http.ResponseWriter,\
+    \ headers map[string]string) {\n\theader := w.Header()\n\tfor k, v := range headers\
+    \ {\n\t\tif header.Get(k) == \"\" {\n\t\t\theader.Set(k, v)\n\t\t}\n\t}\n}\n\n\
+    ### Source File Dependency Files Content\n### Dependency File: empty.go\n\nOutput\
+    \ the complete test file, code only, no explanations.\n### Time\nCurrent time:\
+    \ 2025-03-23 23:53:32\n"
+  role: user

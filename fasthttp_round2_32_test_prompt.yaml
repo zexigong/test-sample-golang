@@ -1,0 +1,20 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: fasthttp\nTest File Path: fasthttp\\round2_32_test.go\\\
+    round2_32_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: fasthttp\\round2_32_test.go\\source_files\\\
+    round2_32.go\n//go:build !amd64 && !arm64 && !ppc64 && !ppc64le && !riscv64 &&\
+    \ !s390x\n\npackage fasthttp\n\nimport \"math\"\n\nfunc roundUpForSliceCap(n int)\
+    \ int {\n\tif n <= 0 {\n\t\treturn 0\n\t}\n\n\t// Above 100MB, we don't round\
+    \ up as the overhead is too large.\n\tif n > 100*1024*1024 {\n\t\treturn n\n\t\
+    }\n\n\tx := uint32(n - 1)\n\tx |= x >> 1\n\tx |= x >> 2\n\tx |= x >> 4\n\tx |=\
+    \ x >> 8\n\tx |= x >> 16\n\n\t// Make sure we don't return 0 due to overflow,\
+    \ even on 32 bit systems\n\tif x >= uint32(math.MaxInt32) {\n\t\treturn math.MaxInt32\n\
+    \t}\n\n\treturn int(x + 1)\n}\n\n### Source File Dependency Files Content\n###\
+    \ Dependency File: empty.go\n\nOutput the complete test file, code only, no explanations.\n\
+    ### Time\nCurrent time: 2025-03-23 23:29:52\n"
+  role: user

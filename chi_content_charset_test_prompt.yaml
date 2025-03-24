@@ -1,0 +1,31 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: chi\nTest File Path: chi\\content_charset_test.go\\\
+    content_charset_test.go\nProject Programming Language: Go\nTesting Framework:\
+    \ go testing\n### Source File Content\n### Source File: chi\\content_charset_test.go\\\
+    source_files\\content_charset.go\npackage middleware\n\nimport (\n\t\"net/http\"\
+    \n\t\"strings\"\n)\n\n// ContentCharset generates a handler that writes a 415\
+    \ Unsupported Media Type response if none of the charsets match.\n// An empty\
+    \ charset will allow requests with no Content-Type header or no specified charset.\n\
+    func ContentCharset(charsets ...string) func(next http.Handler) http.Handler {\n\
+    \tfor i, c := range charsets {\n\t\tcharsets[i] = strings.ToLower(c)\n\t}\n\n\t\
+    return func(next http.Handler) http.Handler {\n\t\treturn http.HandlerFunc(func(w\
+    \ http.ResponseWriter, r *http.Request) {\n\t\t\tif !contentEncoding(r.Header.Get(\"\
+    Content-Type\"), charsets...) {\n\t\t\t\tw.WriteHeader(http.StatusUnsupportedMediaType)\n\
+    \t\t\t\treturn\n\t\t\t}\n\n\t\t\tnext.ServeHTTP(w, r)\n\t\t})\n\t}\n}\n\n// Check\
+    \ the content encoding against a list of acceptable values.\nfunc contentEncoding(ce\
+    \ string, charsets ...string) bool {\n\t_, ce = split(strings.ToLower(ce), \"\
+    ;\")\n\t_, ce = split(ce, \"charset=\")\n\tce, _ = split(ce, \";\")\n\tfor _,\
+    \ c := range charsets {\n\t\tif ce == c {\n\t\t\treturn true\n\t\t}\n\t}\n\n\t\
+    return false\n}\n\n// Split a string in two parts, cleaning any whitespace.\n\
+    func split(str, sep string) (string, string) {\n\tvar a, b string\n\tvar parts\
+    \ = strings.SplitN(str, sep, 2)\n\ta = strings.TrimSpace(parts[0])\n\tif len(parts)\
+    \ == 2 {\n\t\tb = strings.TrimSpace(parts[1])\n\t}\n\n\treturn a, b\n}\n\n###\
+    \ Source File Dependency Files Content\n### Dependency File: empty.go\n\nOutput\
+    \ the complete test file, code only, no explanations.\n### Time\nCurrent time:\
+    \ 2025-03-23 22:48:25\n"
+  role: user

@@ -1,0 +1,45 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: hugo\nTest File Path: hugo\\slice_test.go\\\
+    slice_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: hugo\\slice_test.go\\source_files\\\
+    slice.go\n// Copyright 2018 The Hugo Authors. All rights reserved.\n//\n// Licensed\
+    \ under the Apache License, Version 2.0 (the \"License\");\n// you may not use\
+    \ this file except in compliance with the License.\n// You may obtain a copy of\
+    \ the License at\n// http://www.apache.org/licenses/LICENSE-2.0\n//\n// Unless\
+    \ required by applicable law or agreed to in writing, software\n// distributed\
+    \ under the License is distributed on an \"AS IS\" BASIS,\n// WITHOUT WARRANTIES\
+    \ OR CONDITIONS OF ANY KIND, either express or implied.\n// See the License for\
+    \ the specific language governing permissions and\n// limitations under the License.\n\
+    \npackage collections\n\nimport (\n\t\"reflect\"\n\t\"sort\"\n)\n\n// Slicer defines\
+    \ a very generic way to create a typed slice. This is used\n// in collections.Slice\
+    \ template func to get types such as Pages, PageGroups etc.\n// instead of the\
+    \ less useful []interface{}.\ntype Slicer interface {\n\tSlice(items any) (any,\
+    \ error)\n}\n\n// Slice returns a slice of all passed arguments.\nfunc Slice(args\
+    \ ...any) any {\n\tif len(args) == 0 {\n\t\treturn args\n\t}\n\n\tfirst := args[0]\n\
+    \tfirstType := reflect.TypeOf(first)\n\n\tif firstType == nil {\n\t\treturn args\n\
+    \t}\n\n\tif g, ok := first.(Slicer); ok {\n\t\tv, err := g.Slice(args)\n\t\tif\
+    \ err == nil {\n\t\t\treturn v\n\t\t}\n\n\t\t// If Slice fails, the items are\
+    \ not of the same type and\n\t\t// []interface{} is the best we can do.\n\t\t\
+    return args\n\t}\n\n\tif len(args) > 1 {\n\t\t// This can be a mix of types.\n\
+    \t\tfor i := 1; i < len(args); i++ {\n\t\t\tif firstType != reflect.TypeOf(args[i])\
+    \ {\n\t\t\t\t// []interface{} is the best we can do\n\t\t\t\treturn args\n\t\t\
+    \t}\n\t\t}\n\t}\n\n\tslice := reflect.MakeSlice(reflect.SliceOf(firstType), len(args),\
+    \ len(args))\n\tfor i, arg := range args {\n\t\tslice.Index(i).Set(reflect.ValueOf(arg))\n\
+    \t}\n\treturn slice.Interface()\n}\n\n// StringSliceToInterfaceSlice converts\
+    \ ss to []interface{}.\nfunc StringSliceToInterfaceSlice(ss []string) []any {\n\
+    \tresult := make([]any, len(ss))\n\tfor i, s := range ss {\n\t\tresult[i] = s\n\
+    \t}\n\treturn result\n}\n\ntype SortedStringSlice []string\n\n// Contains returns\
+    \ true if s is in ss.\nfunc (ss SortedStringSlice) Contains(s string) bool {\n\
+    \ti := sort.SearchStrings(ss, s)\n\treturn i < len(ss) && ss[i] == s\n}\n\n//\
+    \ Count returns the number of times s is in ss.\nfunc (ss SortedStringSlice) Count(s\
+    \ string) int {\n\tvar count int\n\ti := sort.SearchStrings(ss, s)\n\tfor i <\
+    \ len(ss) && ss[i] == s {\n\t\tcount++\n\t\ti++\n\t}\n\treturn count\n}\n\n###\
+    \ Source File Dependency Files Content\n### Dependency File: empty.go\n\nOutput\
+    \ the complete test file, code only, no explanations.\n### Time\nCurrent time:\
+    \ 2025-03-23 23:57:01\n"
+  role: user

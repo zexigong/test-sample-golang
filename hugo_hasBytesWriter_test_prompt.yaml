@@ -1,0 +1,36 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: hugo\nTest File Path: hugo\\hasBytesWriter_test.go\\\
+    hasBytesWriter_test.go\nProject Programming Language: Go\nTesting Framework: go\
+    \ testing\n### Source File Content\n### Source File: hugo\\hasBytesWriter_test.go\\\
+    source_files\\hasBytesWriter.go\n// Copyright 2024 The Hugo Authors. All rights\
+    \ reserved.\n//\n// Licensed under the Apache License, Version 2.0 (the \"License\"\
+    );\n// you may not use this file except in compliance with the License.\n// You\
+    \ may obtain a copy of the License at\n// http://www.apache.org/licenses/LICENSE-2.0\n\
+    //\n// Unless required by applicable law or agreed to in writing, software\n//\
+    \ distributed under the License is distributed on an \"AS IS\" BASIS,\n// WITHOUT\
+    \ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n// See the\
+    \ License for the specific language governing permissions and\n// limitations\
+    \ under the License.\n\npackage hugio\n\nimport (\n\t\"bytes\"\n)\n\n// HasBytesWriter\
+    \ is a writer will match against a slice of patterns.\ntype HasBytesWriter struct\
+    \ {\n\tPatterns []*HasBytesPattern\n\n\ti    int\n\tdone bool\n\tbuff []byte\n\
+    }\n\ntype HasBytesPattern struct {\n\tMatch   bool\n\tPattern []byte\n}\n\nfunc\
+    \ (h *HasBytesWriter) patternLen() int {\n\tl := 0\n\tfor _, p := range h.Patterns\
+    \ {\n\t\tl += len(p.Pattern)\n\t}\n\treturn l\n}\n\nfunc (h *HasBytesWriter) Write(p\
+    \ []byte) (n int, err error) {\n\tif h.done {\n\t\treturn len(p), nil\n\t}\n\n\
+    \tif len(h.buff) == 0 {\n\t\th.buff = make([]byte, h.patternLen()*2)\n\t}\n\n\t\
+    for i := range p {\n\t\th.buff[h.i] = p[i]\n\t\th.i++\n\t\tif h.i == len(h.buff)\
+    \ {\n\t\t\t// Shift left.\n\t\t\tcopy(h.buff, h.buff[len(h.buff)/2:])\n\t\t\t\
+    h.i = len(h.buff) / 2\n\t\t}\n\n\t\tfor _, pp := range h.Patterns {\n\t\t\tif\
+    \ bytes.Contains(h.buff, pp.Pattern) {\n\t\t\t\tpp.Match = true\n\t\t\t\tdone\
+    \ := true\n\t\t\t\tfor _, ppp := range h.Patterns {\n\t\t\t\t\tif !ppp.Match {\n\
+    \t\t\t\t\t\tdone = false\n\t\t\t\t\t\tbreak\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\t\
+    if done {\n\t\t\t\t\th.done = true\n\t\t\t\t}\n\t\t\t\treturn len(p), nil\n\t\t\
+    \t}\n\t\t}\n\n\t}\n\n\treturn len(p), nil\n}\n\n### Source File Dependency Files\
+    \ Content\n### Dependency File: empty.go\n\nOutput the complete test file, code\
+    \ only, no explanations.\n### Time\nCurrent time: 2025-03-23 23:56:30\n"
+  role: user

@@ -1,0 +1,31 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: gin\nTest File Path: gin\\fs_test.go\\fs_test.go\n\
+    Project Programming Language: Go\nTesting Framework: go testing\n### Source File\
+    \ Content\n### Source File: gin\\fs_test.go\\source_files\\fs.go\n// Copyright\
+    \ 2017 Manu Martinez-Almeida. All rights reserved.\n// Use of this source code\
+    \ is governed by a MIT style\n// license that can be found in the LICENSE file.\n\
+    \npackage gin\n\nimport (\n\t\"net/http\"\n\t\"os\"\n)\n\n// OnlyFilesFS implements\
+    \ an http.FileSystem without `Readdir` functionality.\ntype OnlyFilesFS struct\
+    \ {\n\tFileSystem http.FileSystem\n}\n\n// Open passes `Open` to the upstream\
+    \ implementation without `Readdir` functionality.\nfunc (o OnlyFilesFS) Open(name\
+    \ string) (http.File, error) {\n\tf, err := o.FileSystem.Open(name)\n\n\tif err\
+    \ != nil {\n\t\treturn nil, err\n\t}\n\n\treturn neutralizedReaddirFile{f}, nil\n\
+    }\n\n// neutralizedReaddirFile wraps http.File with a specific implementation\
+    \ of `Readdir`.\ntype neutralizedReaddirFile struct {\n\thttp.File\n}\n\n// Readdir\
+    \ overrides the http.File default implementation and always returns nil.\nfunc\
+    \ (n neutralizedReaddirFile) Readdir(_ int) ([]os.FileInfo, error) {\n\t// this\
+    \ disables directory listing\n\treturn nil, nil\n}\n\n// Dir returns an http.FileSystem\
+    \ that can be used by http.FileServer().\n// It is used internally in router.Static().\n\
+    // if listDirectory == true, then it works the same as http.Dir(),\n// otherwise\
+    \ it returns a filesystem that prevents http.FileServer() to list the directory\
+    \ files.\nfunc Dir(root string, listDirectory bool) http.FileSystem {\n\tfs :=\
+    \ http.Dir(root)\n\n\tif listDirectory {\n\t\treturn fs\n\t}\n\n\treturn &OnlyFilesFS{FileSystem:\
+    \ fs}\n}\n\n### Source File Dependency Files Content\n### Dependency File: empty.go\n\
+    \nOutput the complete test file, code only, no explanations.\n### Time\nCurrent\
+    \ time: 2025-03-23 23:53:07\n"
+  role: user

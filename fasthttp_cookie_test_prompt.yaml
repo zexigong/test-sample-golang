@@ -1,0 +1,214 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: fasthttp\nTest File Path: fasthttp\\cookie_test.go\\\
+    cookie_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: fasthttp\\cookie_test.go\\source_files\\\
+    cookie.go\npackage fasthttp\n\nimport (\n\t\"bytes\"\n\t\"errors\"\n\t\"io\"\n\
+    \t\"sync\"\n\t\"time\"\n)\n\nvar zeroTime time.Time\n\nvar (\n\t// CookieExpireDelete\
+    \ may be set on Cookie.Expire for expiring the given cookie.\n\tCookieExpireDelete\
+    \ = time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)\n\n\t// CookieExpireUnlimited\
+    \ indicates that the cookie doesn't expire.\n\tCookieExpireUnlimited = zeroTime\n\
+    )\n\n// CookieSameSite is an enum for the mode in which the SameSite flag should\
+    \ be set for the given cookie.\n// See https://tools.ietf.org/html/draft-ietf-httpbis-cookie-same-site-00\
+    \ for details.\ntype CookieSameSite int\n\nconst (\n\t// CookieSameSiteDisabled\
+    \ removes the SameSite flag.\n\tCookieSameSiteDisabled CookieSameSite = iota\n\
+    \t// CookieSameSiteDefaultMode sets the SameSite flag.\n\tCookieSameSiteDefaultMode\n\
+    \t// CookieSameSiteLaxMode sets the SameSite flag with the \"Lax\" parameter.\n\
+    \tCookieSameSiteLaxMode\n\t// CookieSameSiteStrictMode sets the SameSite flag\
+    \ with the \"Strict\" parameter.\n\tCookieSameSiteStrictMode\n\t// CookieSameSiteNoneMode\
+    \ sets the SameSite flag with the \"None\" parameter.\n\t// See https://tools.ietf.org/html/draft-west-cookie-incrementalism-00\n\
+    \tCookieSameSiteNoneMode // third-party cookies are phasing out, use Partitioned\
+    \ cookies instead\n)\n\n// AcquireCookie returns an empty Cookie object from the\
+    \ pool.\n//\n// The returned object may be returned back to the pool with ReleaseCookie.\n\
+    // This allows reducing GC load.\nfunc AcquireCookie() *Cookie {\n\treturn cookiePool.Get().(*Cookie)\n\
+    }\n\n// ReleaseCookie returns the Cookie object acquired with AcquireCookie back\n\
+    // to the pool.\n//\n// Do not access released Cookie object, otherwise data races\
+    \ may occur.\nfunc ReleaseCookie(c *Cookie) {\n\tc.Reset()\n\tcookiePool.Put(c)\n\
+    }\n\nvar cookiePool = &sync.Pool{\n\tNew: func() any {\n\t\treturn &Cookie{}\n\
+    \t},\n}\n\n// Cookie represents HTTP response cookie.\n//\n// Do not copy Cookie\
+    \ objects. Create new object and use CopyTo instead.\n//\n// Cookie instance MUST\
+    \ NOT be used from concurrently running goroutines.\ntype Cookie struct {\n\t\
+    noCopy noCopy\n\n\texpire time.Time\n\n\tkey    []byte\n\tvalue  []byte\n\tdomain\
+    \ []byte\n\tpath   []byte\n\n\tbufK []byte\n\tbufV []byte\n\n\t// maxAge=0 means\
+    \ no 'max-age' attribute specified.\n\t// maxAge<0 means delete cookie now, equivalently\
+    \ 'max-age=0'\n\t// maxAge>0 means 'max-age' attribute present and given in seconds\n\
+    \tmaxAge int\n\n\tsameSite    CookieSameSite\n\thttpOnly    bool\n\tsecure   \
+    \   bool\n\tpartitioned bool\n}\n\n// CopyTo copies src cookie to c.\nfunc (c\
+    \ *Cookie) CopyTo(src *Cookie) {\n\tc.Reset()\n\tc.key = append(c.key, src.key...)\n\
+    \tc.value = append(c.value, src.value...)\n\tc.expire = src.expire\n\tc.maxAge\
+    \ = src.maxAge\n\tc.domain = append(c.domain, src.domain...)\n\tc.path = append(c.path,\
+    \ src.path...)\n\tc.httpOnly = src.httpOnly\n\tc.secure = src.secure\n\tc.sameSite\
+    \ = src.sameSite\n\tc.partitioned = src.partitioned\n}\n\n// HTTPOnly returns\
+    \ true if the cookie is http only.\nfunc (c *Cookie) HTTPOnly() bool {\n\treturn\
+    \ c.httpOnly\n}\n\n// SetHTTPOnly sets cookie's httpOnly flag to the given value.\n\
+    func (c *Cookie) SetHTTPOnly(httpOnly bool) {\n\tc.httpOnly = httpOnly\n}\n\n\
+    // Secure returns true if the cookie is secure.\nfunc (c *Cookie) Secure() bool\
+    \ {\n\treturn c.secure\n}\n\n// SetSecure sets cookie's secure flag to the given\
+    \ value.\nfunc (c *Cookie) SetSecure(secure bool) {\n\tc.secure = secure\n}\n\n\
+    // SameSite returns the SameSite mode.\nfunc (c *Cookie) SameSite() CookieSameSite\
+    \ {\n\treturn c.sameSite\n}\n\n// SetSameSite sets the cookie's SameSite flag\
+    \ to the given value.\n// Set value CookieSameSiteNoneMode will set Secure to\
+    \ true also to avoid browser rejection.\nfunc (c *Cookie) SetSameSite(mode CookieSameSite)\
+    \ {\n\tc.sameSite = mode\n\tif mode == CookieSameSiteNoneMode {\n\t\tc.SetSecure(true)\n\
+    \t}\n}\n\n// Partitioned returns true if the cookie is partitioned.\nfunc (c *Cookie)\
+    \ Partitioned() bool {\n\treturn c.partitioned\n}\n\n// SetPartitioned sets the\
+    \ cookie's Partitioned flag to the given value.\n// Set value Partitioned to true\
+    \ will set Secure to true and Path to / also to avoid browser rejection.\nfunc\
+    \ (c *Cookie) SetPartitioned(partitioned bool) {\n\tc.partitioned = partitioned\n\
+    \tif partitioned {\n\t\tc.SetSecure(true)\n\t\tc.SetPath(\"/\")\n\t}\n}\n\n//\
+    \ Path returns cookie path.\nfunc (c *Cookie) Path() []byte {\n\treturn c.path\n\
+    }\n\n// SetPath sets cookie path.\nfunc (c *Cookie) SetPath(path string) {\n\t\
+    c.bufK = append(c.bufK[:0], path...)\n\tc.path = normalizePath(c.path, c.bufK)\n\
+    }\n\n// SetPathBytes sets cookie path.\nfunc (c *Cookie) SetPathBytes(path []byte)\
+    \ {\n\tc.bufK = append(c.bufK[:0], path...)\n\tc.path = normalizePath(c.path,\
+    \ c.bufK)\n}\n\n// Domain returns cookie domain.\n//\n// The returned value is\
+    \ valid until the Cookie reused or released (ReleaseCookie).\n// Do not store\
+    \ references to the returned value. Make copies instead.\nfunc (c *Cookie) Domain()\
+    \ []byte {\n\treturn c.domain\n}\n\n// SetDomain sets cookie domain.\nfunc (c\
+    \ *Cookie) SetDomain(domain string) {\n\tc.domain = append(c.domain[:0], domain...)\n\
+    }\n\n// SetDomainBytes sets cookie domain.\nfunc (c *Cookie) SetDomainBytes(domain\
+    \ []byte) {\n\tc.domain = append(c.domain[:0], domain...)\n}\n\n// MaxAge returns\
+    \ the seconds until the cookie is meant to expire or 0\n// if no max age.\nfunc\
+    \ (c *Cookie) MaxAge() int {\n\treturn c.maxAge\n}\n\n// SetMaxAge sets cookie\
+    \ expiration time based on seconds. This takes precedence\n// over any absolute\
+    \ expiry set on the cookie.\n//\n// 'max-age' is set when the maxAge is non-zero.\
+    \ That is, if maxAge = 0,\n// the 'max-age' is unset. If maxAge < 0, it indicates\
+    \ that the cookie should\n// be deleted immediately, equivalent to 'max-age=0'.\
+    \ This behavior is\n// consistent with the Go standard library's net/http package.\n\
+    func (c *Cookie) SetMaxAge(seconds int) {\n\tc.maxAge = seconds\n}\n\n// Expire\
+    \ returns cookie expiration time.\n//\n// CookieExpireUnlimited is returned if\
+    \ cookie doesn't expire.\nfunc (c *Cookie) Expire() time.Time {\n\texpire := c.expire\n\
+    \tif expire.IsZero() {\n\t\texpire = CookieExpireUnlimited\n\t}\n\treturn expire\n\
+    }\n\n// SetExpire sets cookie expiration time.\n//\n// Set expiration time to\
+    \ CookieExpireDelete for expiring (deleting)\n// the cookie on the client.\n//\n\
+    // By default cookie lifetime is limited by browser session.\nfunc (c *Cookie)\
+    \ SetExpire(expire time.Time) {\n\tc.expire = expire\n}\n\n// Value returns cookie\
+    \ value.\n//\n// The returned value is valid until the Cookie reused or released\
+    \ (ReleaseCookie).\n// Do not store references to the returned value. Make copies\
+    \ instead.\nfunc (c *Cookie) Value() []byte {\n\treturn c.value\n}\n\n// SetValue\
+    \ sets cookie value.\nfunc (c *Cookie) SetValue(value string) {\n\tc.value = append(c.value[:0],\
+    \ value...)\n}\n\n// SetValueBytes sets cookie value.\nfunc (c *Cookie) SetValueBytes(value\
+    \ []byte) {\n\tc.value = append(c.value[:0], value...)\n}\n\n// Key returns cookie\
+    \ name.\n//\n// The returned value is valid until the Cookie reused or released\
+    \ (ReleaseCookie).\n// Do not store references to the returned value. Make copies\
+    \ instead.\nfunc (c *Cookie) Key() []byte {\n\treturn c.key\n}\n\n// SetKey sets\
+    \ cookie name.\nfunc (c *Cookie) SetKey(key string) {\n\tc.key = append(c.key[:0],\
+    \ key...)\n}\n\n// SetKeyBytes sets cookie name.\nfunc (c *Cookie) SetKeyBytes(key\
+    \ []byte) {\n\tc.key = append(c.key[:0], key...)\n}\n\n// Reset clears the cookie.\n\
+    func (c *Cookie) Reset() {\n\tc.key = c.key[:0]\n\tc.value = c.value[:0]\n\tc.expire\
+    \ = zeroTime\n\tc.maxAge = 0\n\tc.domain = c.domain[:0]\n\tc.path = c.path[:0]\n\
+    \tc.httpOnly = false\n\tc.secure = false\n\tc.sameSite = CookieSameSiteDisabled\n\
+    \tc.partitioned = false\n}\n\n// AppendBytes appends cookie representation to\
+    \ dst and returns\n// the extended dst.\nfunc (c *Cookie) AppendBytes(dst []byte)\
+    \ []byte {\n\tif len(c.key) > 0 {\n\t\tdst = append(dst, c.key...)\n\t\tdst =\
+    \ append(dst, '=')\n\t}\n\tdst = append(dst, c.value...)\n\n\tif c.maxAge != 0\
+    \ {\n\t\tdst = append(dst, ';', ' ')\n\t\tdst = append(dst, strCookieMaxAge...)\n\
+    \t\tdst = append(dst, '=')\n\t\tif c.maxAge < 0 {\n\t\t\t// See https://github.com/valyala/fasthttp/issues/1900\n\
+    \t\t\tdst = AppendUint(dst, 0)\n\t\t} else {\n\t\t\tdst = AppendUint(dst, c.maxAge)\n\
+    \t\t}\n\t} else if !c.expire.IsZero() {\n\t\tc.bufV = AppendHTTPDate(c.bufV[:0],\
+    \ c.expire)\n\t\tdst = append(dst, ';', ' ')\n\t\tdst = append(dst, strCookieExpires...)\n\
+    \t\tdst = append(dst, '=')\n\t\tdst = append(dst, c.bufV...)\n\t}\n\tif len(c.domain)\
+    \ > 0 {\n\t\tdst = appendCookiePart(dst, strCookieDomain, c.domain)\n\t}\n\tif\
+    \ len(c.path) > 0 {\n\t\tdst = appendCookiePart(dst, strCookiePath, c.path)\n\t\
+    }\n\tif c.httpOnly {\n\t\tdst = append(dst, ';', ' ')\n\t\tdst = append(dst, strCookieHTTPOnly...)\n\
+    \t}\n\tif c.secure {\n\t\tdst = append(dst, ';', ' ')\n\t\tdst = append(dst, strCookieSecure...)\n\
+    \t}\n\tswitch c.sameSite {\n\tcase CookieSameSiteDefaultMode:\n\t\tdst = append(dst,\
+    \ ';', ' ')\n\t\tdst = append(dst, strCookieSameSite...)\n\tcase CookieSameSiteLaxMode:\n\
+    \t\tdst = append(dst, ';', ' ')\n\t\tdst = append(dst, strCookieSameSite...)\n\
+    \t\tdst = append(dst, '=')\n\t\tdst = append(dst, strCookieSameSiteLax...)\n\t\
+    case CookieSameSiteStrictMode:\n\t\tdst = append(dst, ';', ' ')\n\t\tdst = append(dst,\
+    \ strCookieSameSite...)\n\t\tdst = append(dst, '=')\n\t\tdst = append(dst, strCookieSameSiteStrict...)\n\
+    \tcase CookieSameSiteNoneMode:\n\t\tdst = append(dst, ';', ' ')\n\t\tdst = append(dst,\
+    \ strCookieSameSite...)\n\t\tdst = append(dst, '=')\n\t\tdst = append(dst, strCookieSameSiteNone...)\n\
+    \t}\n\tif c.partitioned {\n\t\tdst = append(dst, ';', ' ')\n\t\tdst = append(dst,\
+    \ strCookiePartitioned...)\n\t}\n\treturn dst\n}\n\n// Cookie returns cookie representation.\n\
+    //\n// The returned value is valid until the Cookie reused or released (ReleaseCookie).\n\
+    // Do not store references to the returned value. Make copies instead.\nfunc (c\
+    \ *Cookie) Cookie() []byte {\n\tc.bufK = c.AppendBytes(c.bufK[:0])\n\treturn c.bufK\n\
+    }\n\n// String returns cookie representation.\nfunc (c *Cookie) String() string\
+    \ {\n\treturn string(c.Cookie())\n}\n\n// WriteTo writes cookie representation\
+    \ to w.\n//\n// WriteTo implements io.WriterTo interface.\nfunc (c *Cookie) WriteTo(w\
+    \ io.Writer) (int64, error) {\n\tn, err := w.Write(c.Cookie())\n\treturn int64(n),\
+    \ err\n}\n\nvar errNoCookies = errors.New(\"no cookies found\")\n\n// Parse parses\
+    \ Set-Cookie header.\nfunc (c *Cookie) Parse(src string) error {\n\tc.bufK = append(c.bufK[:0],\
+    \ src...)\n\treturn c.ParseBytes(c.bufK)\n}\n\n// ParseBytes parses Set-Cookie\
+    \ header.\nfunc (c *Cookie) ParseBytes(src []byte) error {\n\tc.Reset()\n\n\t\
+    var s cookieScanner\n\ts.b = src\n\n\tif !s.next(&c.bufK, &c.bufV) {\n\t\treturn\
+    \ errNoCookies\n\t}\n\n\tc.key = append(c.key, c.bufK...)\n\tc.value = append(c.value,\
+    \ c.bufV...)\n\n\tfor s.next(&c.bufK, &c.bufV) {\n\t\tif len(c.bufK) != 0 {\n\t\
+    \t\t// Case insensitive switch on first char\n\t\t\tswitch c.bufK[0] | 0x20 {\n\
+    \t\t\tcase 'm':\n\t\t\t\tif caseInsensitiveCompare(strCookieMaxAge, c.bufK) {\n\
+    \t\t\t\t\tmaxAge, err := ParseUint(c.bufV)\n\t\t\t\t\tif err != nil {\n\t\t\t\t\
+    \t\treturn err\n\t\t\t\t\t}\n\t\t\t\t\tc.maxAge = maxAge\n\t\t\t\t}\n\n\t\t\t\
+    case 'e': // \"expires\"\n\t\t\t\tif caseInsensitiveCompare(strCookieExpires,\
+    \ c.bufK) {\n\t\t\t\t\tv := b2s(c.bufV)\n\t\t\t\t\t// Try the same two formats\
+    \ as net/http\n\t\t\t\t\t// See: https://github.com/golang/go/blob/00379be17e63a5b75b3237819392d2dc3b313a27/src/net/http/cookie.go#L133-L135\n\
+    \t\t\t\t\texptime, err := time.ParseInLocation(time.RFC1123, v, time.UTC)\n\t\t\
+    \t\t\tif err != nil {\n\t\t\t\t\t\texptime, err = time.Parse(\"Mon, 02-Jan-2006\
+    \ 15:04:05 MST\", v)\n\t\t\t\t\t\tif err != nil {\n\t\t\t\t\t\t\treturn err\n\t\
+    \t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\tc.expire = exptime\n\t\t\t\t}\n\n\t\t\tcase\
+    \ 'd': // \"domain\"\n\t\t\t\tif caseInsensitiveCompare(strCookieDomain, c.bufK)\
+    \ {\n\t\t\t\t\tc.domain = append(c.domain, c.bufV...)\n\t\t\t\t}\n\n\t\t\tcase\
+    \ 'p': // \"path\"\n\t\t\t\tif caseInsensitiveCompare(strCookiePath, c.bufK) {\n\
+    \t\t\t\t\tc.path = append(c.path, c.bufV...)\n\t\t\t\t}\n\n\t\t\tcase 's': //\
+    \ \"samesite\"\n\t\t\t\tif caseInsensitiveCompare(strCookieSameSite, c.bufK) {\n\
+    \t\t\t\t\tif len(c.bufV) > 0 {\n\t\t\t\t\t\t// Case insensitive switch on first\
+    \ char\n\t\t\t\t\t\tswitch c.bufV[0] | 0x20 {\n\t\t\t\t\t\tcase 'l': // \"lax\"\
+    \n\t\t\t\t\t\t\tif caseInsensitiveCompare(strCookieSameSiteLax, c.bufV) {\n\t\t\
+    \t\t\t\t\t\tc.sameSite = CookieSameSiteLaxMode\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\
+    case 's': // \"strict\"\n\t\t\t\t\t\t\tif caseInsensitiveCompare(strCookieSameSiteStrict,\
+    \ c.bufV) {\n\t\t\t\t\t\t\t\tc.sameSite = CookieSameSiteStrictMode\n\t\t\t\t\t\
+    \t\t}\n\t\t\t\t\t\tcase 'n': // \"none\"\n\t\t\t\t\t\t\tif caseInsensitiveCompare(strCookieSameSiteNone,\
+    \ c.bufV) {\n\t\t\t\t\t\t\t\tc.sameSite = CookieSameSiteNoneMode\n\t\t\t\t\t\t\
+    \t}\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t} else if len(c.bufV)\
+    \ != 0 {\n\t\t\t// Case insensitive switch on first char\n\t\t\tswitch c.bufV[0]\
+    \ | 0x20 {\n\t\t\tcase 'h': // \"httponly\"\n\t\t\t\tif caseInsensitiveCompare(strCookieHTTPOnly,\
+    \ c.bufV) {\n\t\t\t\t\tc.httpOnly = true\n\t\t\t\t}\n\n\t\t\tcase 's': // \"secure\"\
+    \n\t\t\t\tif caseInsensitiveCompare(strCookieSecure, c.bufV) {\n\t\t\t\t\tc.secure\
+    \ = true\n\t\t\t\t} else if caseInsensitiveCompare(strCookieSameSite, c.bufV)\
+    \ {\n\t\t\t\t\tc.sameSite = CookieSameSiteDefaultMode\n\t\t\t\t}\n\t\t\tcase 'p':\
+    \ // \"partitioned\"\n\t\t\t\tif caseInsensitiveCompare(strCookiePartitioned,\
+    \ c.bufV) {\n\t\t\t\t\tc.partitioned = true\n\t\t\t\t}\n\t\t\t}\n\t\t} // else\
+    \ empty or no match\n\t}\n\treturn nil\n}\n\nfunc appendCookiePart(dst, key, value\
+    \ []byte) []byte {\n\tdst = append(dst, ';', ' ')\n\tdst = append(dst, key...)\n\
+    \tdst = append(dst, '=')\n\treturn append(dst, value...)\n}\n\nfunc getCookieKey(dst,\
+    \ src []byte) []byte {\n\tn := bytes.IndexByte(src, '=')\n\tif n >= 0 {\n\t\t\
+    src = src[:n]\n\t}\n\treturn decodeCookieArg(dst, src, false)\n}\n\nfunc appendRequestCookieBytes(dst\
+    \ []byte, cookies []argsKV) []byte {\n\tfor i, n := 0, len(cookies); i < n; i++\
+    \ {\n\t\tkv := &cookies[i]\n\t\tif len(kv.key) > 0 {\n\t\t\tdst = append(dst,\
+    \ kv.key...)\n\t\t\tdst = append(dst, '=')\n\t\t}\n\t\tdst = append(dst, kv.value...)\n\
+    \t\tif i+1 < n {\n\t\t\tdst = append(dst, ';', ' ')\n\t\t}\n\t}\n\treturn dst\n\
+    }\n\n// For Response we can not use the above function as response cookies\n//\
+    \ already contain the key= in the value.\nfunc appendResponseCookieBytes(dst []byte,\
+    \ cookies []argsKV) []byte {\n\tfor i, n := 0, len(cookies); i < n; i++ {\n\t\t\
+    kv := &cookies[i]\n\t\tdst = append(dst, kv.value...)\n\t\tif i+1 < n {\n\t\t\t\
+    dst = append(dst, ';', ' ')\n\t\t}\n\t}\n\treturn dst\n}\n\nfunc parseRequestCookies(cookies\
+    \ []argsKV, src []byte) []argsKV {\n\tvar s cookieScanner\n\ts.b = src\n\tvar\
+    \ kv *argsKV\n\tcookies, kv = allocArg(cookies)\n\tfor s.next(&kv.key, &kv.value)\
+    \ {\n\t\tif len(kv.key) > 0 || len(kv.value) > 0 {\n\t\t\tcookies, kv = allocArg(cookies)\n\
+    \t\t}\n\t}\n\treturn releaseArg(cookies)\n}\n\ntype cookieScanner struct {\n\t\
+    b []byte\n}\n\nfunc (s *cookieScanner) next(key, val *[]byte) bool {\n\tb := s.b\n\
+    \tif len(b) == 0 {\n\t\treturn false\n\t}\n\n\tisKey := true\n\tk := 0\n\tfor\
+    \ i, c := range b {\n\t\tswitch c {\n\t\tcase '=':\n\t\t\tif isKey {\n\t\t\t\t\
+    isKey = false\n\t\t\t\t*key = decodeCookieArg(*key, b[:i], false)\n\t\t\t\tk =\
+    \ i + 1\n\t\t\t}\n\t\tcase ';':\n\t\t\tif isKey {\n\t\t\t\t*key = (*key)[:0]\n\
+    \t\t\t}\n\t\t\t*val = decodeCookieArg(*val, b[k:i], true)\n\t\t\ts.b = b[i+1:]\n\
+    \t\t\treturn true\n\t\t}\n\t}\n\n\tif isKey {\n\t\t*key = (*key)[:0]\n\t}\n\t\
+    *val = decodeCookieArg(*val, b[k:], true)\n\ts.b = b[len(b):]\n\treturn true\n\
+    }\n\nfunc decodeCookieArg(dst, src []byte, skipQuotes bool) []byte {\n\tfor len(src)\
+    \ > 0 && src[0] == ' ' {\n\t\tsrc = src[1:]\n\t}\n\tfor len(src) > 0 && src[len(src)-1]\
+    \ == ' ' {\n\t\tsrc = src[:len(src)-1]\n\t}\n\tif skipQuotes {\n\t\tif len(src)\
+    \ > 1 && src[0] == '\"' && src[len(src)-1] == '\"' {\n\t\t\tsrc = src[1 : len(src)-1]\n\
+    \t\t}\n\t}\n\treturn append(dst[:0], src...)\n}\n\n// caseInsensitiveCompare does\
+    \ a case insensitive equality comparison of\n// two []byte. Assumes only letters\
+    \ need to be matched.\nfunc caseInsensitiveCompare(a, b []byte) bool {\n\tif len(a)\
+    \ != len(b) {\n\t\treturn false\n\t}\n\tfor i := 0; i < len(a); i++ {\n\t\tif\
+    \ a[i]|0x20 != b[i]|0x20 {\n\t\t\treturn false\n\t\t}\n\t}\n\treturn true\n}\n\
+    \n### Source File Dependency Files Content\n### Dependency File: empty.go\n\n\
+    Output the complete test file, code only, no explanations.\n### Time\nCurrent\
+    \ time: 2025-03-23 23:29:18\n"
+  role: user

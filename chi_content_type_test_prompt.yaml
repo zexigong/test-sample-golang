@@ -1,0 +1,29 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: chi\nTest File Path: chi\\content_type_test.go\\\
+    content_type_test.go\nProject Programming Language: Go\nTesting Framework: go\
+    \ testing\n### Source File Content\n### Source File: chi\\content_type_test.go\\\
+    source_files\\content_type.go\npackage middleware\n\nimport (\n\t\"net/http\"\n\
+    \t\"strings\"\n)\n\n// SetHeader is a convenience handler to set a response header\
+    \ key/value\nfunc SetHeader(key, value string) func(http.Handler) http.Handler\
+    \ {\n\treturn func(next http.Handler) http.Handler {\n\t\treturn http.HandlerFunc(func(w\
+    \ http.ResponseWriter, r *http.Request) {\n\t\t\tw.Header().Set(key, value)\n\t\
+    \t\tnext.ServeHTTP(w, r)\n\t\t})\n\t}\n}\n\n// AllowContentType enforces a whitelist\
+    \ of request Content-Types otherwise responds\n// with a 415 Unsupported Media\
+    \ Type status.\nfunc AllowContentType(contentTypes ...string) func(http.Handler)\
+    \ http.Handler {\n\tallowedContentTypes := make(map[string]struct{}, len(contentTypes))\n\
+    \tfor _, ctype := range contentTypes {\n\t\tallowedContentTypes[strings.TrimSpace(strings.ToLower(ctype))]\
+    \ = struct{}{}\n\t}\n\n\treturn func(next http.Handler) http.Handler {\n\t\treturn\
+    \ http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n\t\t\tif r.ContentLength\
+    \ == 0 {\n\t\t\t\t// Skip check for empty content body\n\t\t\t\tnext.ServeHTTP(w,\
+    \ r)\n\t\t\t\treturn\n\t\t\t}\n\n\t\t\ts := strings.ToLower(strings.TrimSpace(strings.Split(r.Header.Get(\"\
+    Content-Type\"), \";\")[0]))\n\n\t\t\tif _, ok := allowedContentTypes[s]; ok {\n\
+    \t\t\t\tnext.ServeHTTP(w, r)\n\t\t\t\treturn\n\t\t\t}\n\n\t\t\tw.WriteHeader(http.StatusUnsupportedMediaType)\n\
+    \t\t})\n\t}\n}\n\n\n### Source File Dependency Files Content\n### Dependency File:\
+    \ empty.go\n\nOutput the complete test file, code only, no explanations.\n###\
+    \ Time\nCurrent time: 2025-03-23 22:48:48\n"
+  role: user

@@ -1,0 +1,52 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: chi\nTest File Path: chi\\request_id_test.go\\\
+    request_id_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: chi\\request_id_test.go\\source_files\\\
+    request_id.go\npackage middleware\n\n// Ported from Goji's middleware, source:\n\
+    // https://github.com/zenazn/goji/tree/master/web/middleware\n\nimport (\n\t\"\
+    context\"\n\t\"crypto/rand\"\n\t\"encoding/base64\"\n\t\"fmt\"\n\t\"net/http\"\
+    \n\t\"os\"\n\t\"strings\"\n\t\"sync/atomic\"\n)\n\n// Key to use when setting\
+    \ the request ID.\ntype ctxKeyRequestID int\n\n// RequestIDKey is the key that\
+    \ holds the unique request ID in a request context.\nconst RequestIDKey ctxKeyRequestID\
+    \ = 0\n\n// RequestIDHeader is the name of the HTTP Header which contains the\
+    \ request id.\n// Exported so that it can be changed by developers\nvar RequestIDHeader\
+    \ = \"X-Request-Id\"\n\nvar prefix string\nvar reqid uint64\n\n// A quick note\
+    \ on the statistics here: we're trying to calculate the chance that\n// two randomly\
+    \ generated base62 prefixes will collide. We use the formula from\n// http://en.wikipedia.org/wiki/Birthday_problem\n\
+    //\n// P[m, n] \\approx 1 - e^{-m^2/2n}\n//\n// We ballpark an upper bound for\
+    \ $m$ by imagining (for whatever reason) a server\n// that restarts every second\
+    \ over 10 years, for $m = 86400 * 365 * 10 = 315360000$\n//\n// For a $k$ character\
+    \ base-62 identifier, we have $n(k) = 62^k$\n//\n// Plugging this in, we find\
+    \ $P[m, n(10)] \\approx 5.75%$, which is good enough for\n// our purposes, and\
+    \ is surely more than anyone would ever need in practice -- a\n// process that\
+    \ is rebooted a handful of times a day for a hundred years has less\n// than a\
+    \ millionth of a percent chance of generating two colliding IDs.\n\nfunc init()\
+    \ {\n\thostname, err := os.Hostname()\n\tif hostname == \"\" || err != nil {\n\
+    \t\thostname = \"localhost\"\n\t}\n\tvar buf [12]byte\n\tvar b64 string\n\tfor\
+    \ len(b64) < 10 {\n\t\trand.Read(buf[:])\n\t\tb64 = base64.StdEncoding.EncodeToString(buf[:])\n\
+    \t\tb64 = strings.NewReplacer(\"+\", \"\", \"/\", \"\").Replace(b64)\n\t}\n\n\t\
+    prefix = fmt.Sprintf(\"%s/%s\", hostname, b64[0:10])\n}\n\n// RequestID is a middleware\
+    \ that injects a request ID into the context of each\n// request. A request ID\
+    \ is a string of the form \"host.example.com/random-0001\",\n// where \"random\"\
+    \ is a base62 random string that uniquely identifies this go\n// process, and\
+    \ where the last number is an atomically incremented request\n// counter.\nfunc\
+    \ RequestID(next http.Handler) http.Handler {\n\tfn := func(w http.ResponseWriter,\
+    \ r *http.Request) {\n\t\tctx := r.Context()\n\t\trequestID := r.Header.Get(RequestIDHeader)\n\
+    \t\tif requestID == \"\" {\n\t\t\tmyid := atomic.AddUint64(&reqid, 1)\n\t\t\t\
+    requestID = fmt.Sprintf(\"%s-%06d\", prefix, myid)\n\t\t}\n\t\tctx = context.WithValue(ctx,\
+    \ RequestIDKey, requestID)\n\t\tnext.ServeHTTP(w, r.WithContext(ctx))\n\t}\n\t\
+    return http.HandlerFunc(fn)\n}\n\n// GetReqID returns a request ID from the given\
+    \ context if one is present.\n// Returns the empty string if a request ID cannot\
+    \ be found.\nfunc GetReqID(ctx context.Context) string {\n\tif ctx == nil {\n\t\
+    \treturn \"\"\n\t}\n\tif reqID, ok := ctx.Value(RequestIDKey).(string); ok {\n\
+    \t\treturn reqID\n\t}\n\treturn \"\"\n}\n\n// NextRequestID generates the next\
+    \ request ID in the sequence.\nfunc NextRequestID() uint64 {\n\treturn atomic.AddUint64(&reqid,\
+    \ 1)\n}\n\n### Source File Dependency Files Content\n### Dependency File: empty.go\n\
+    \nOutput the complete test file, code only, no explanations.\n### Time\nCurrent\
+    \ time: 2025-03-23 22:49:56\n"
+  role: user

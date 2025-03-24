@@ -1,0 +1,142 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: fasthttp\nTest File Path: fasthttp\\brotli_test.go\\\
+    brotli_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: fasthttp\\brotli_test.go\\source_files\\\
+    brotli.go\npackage fasthttp\n\nimport (\n\t\"bytes\"\n\t\"fmt\"\n\t\"io\"\n\t\"\
+    sync\"\n\n\t\"github.com/andybalholm/brotli\"\n\t\"github.com/valyala/bytebufferpool\"\
+    \n\t\"github.com/valyala/fasthttp/stackless\"\n)\n\n// Supported compression levels.\n\
+    const (\n\tCompressBrotliNoCompression   = 0\n\tCompressBrotliBestSpeed      \
+    \ = brotli.BestSpeed\n\tCompressBrotliBestCompression = brotli.BestCompression\n\
+    \n\t// Choose a default brotli compression level comparable to\n\t// CompressDefaultCompression\
+    \ (gzip 6)\n\t// See: https://github.com/valyala/fasthttp/issues/798#issuecomment-626293806\n\
+    \tCompressBrotliDefaultCompression = 4\n)\n\nfunc acquireBrotliReader(r io.Reader)\
+    \ (*brotli.Reader, error) {\n\tv := brotliReaderPool.Get()\n\tif v == nil {\n\t\
+    \treturn brotli.NewReader(r), nil\n\t}\n\tzr := v.(*brotli.Reader)\n\tif err :=\
+    \ zr.Reset(r); err != nil {\n\t\treturn nil, err\n\t}\n\treturn zr, nil\n}\n\n\
+    func releaseBrotliReader(zr *brotli.Reader) {\n\tbrotliReaderPool.Put(zr)\n}\n\
+    \nvar brotliReaderPool sync.Pool\n\nfunc acquireStacklessBrotliWriter(w io.Writer,\
+    \ level int) stackless.Writer {\n\tnLevel := normalizeBrotliCompressLevel(level)\n\
+    \tp := stacklessBrotliWriterPoolMap[nLevel]\n\tv := p.Get()\n\tif v == nil {\n\
+    \t\treturn stackless.NewWriter(w, func(w io.Writer) stackless.Writer {\n\t\t\t\
+    return acquireRealBrotliWriter(w, level)\n\t\t})\n\t}\n\tsw := v.(stackless.Writer)\n\
+    \tsw.Reset(w)\n\treturn sw\n}\n\nfunc releaseStacklessBrotliWriter(sw stackless.Writer,\
+    \ level int) {\n\tsw.Close()\n\tnLevel := normalizeBrotliCompressLevel(level)\n\
+    \tp := stacklessBrotliWriterPoolMap[nLevel]\n\tp.Put(sw)\n}\n\nfunc acquireRealBrotliWriter(w\
+    \ io.Writer, level int) *brotli.Writer {\n\tnLevel := normalizeBrotliCompressLevel(level)\n\
+    \tp := realBrotliWriterPoolMap[nLevel]\n\tv := p.Get()\n\tif v == nil {\n\t\t\
+    zw := brotli.NewWriterLevel(w, level)\n\t\treturn zw\n\t}\n\tzw := v.(*brotli.Writer)\n\
+    \tzw.Reset(w)\n\treturn zw\n}\n\nfunc releaseRealBrotliWriter(zw *brotli.Writer,\
+    \ level int) {\n\tzw.Close()\n\tnLevel := normalizeBrotliCompressLevel(level)\n\
+    \tp := realBrotliWriterPoolMap[nLevel]\n\tp.Put(zw)\n}\n\nvar (\n\tstacklessBrotliWriterPoolMap\
+    \ = newCompressWriterPoolMap()\n\trealBrotliWriterPoolMap      = newCompressWriterPoolMap()\n\
+    )\n\n// AppendBrotliBytesLevel appends brotlied src to dst using the given\n//\
+    \ compression level and returns the resulting dst.\n//\n// Supported compression\
+    \ levels are:\n//\n//   - CompressBrotliNoCompression\n//   - CompressBrotliBestSpeed\n\
+    //   - CompressBrotliBestCompression\n//   - CompressBrotliDefaultCompression\n\
+    func AppendBrotliBytesLevel(dst, src []byte, level int) []byte {\n\tw := &byteSliceWriter{b:\
+    \ dst}\n\tWriteBrotliLevel(w, src, level) //nolint:errcheck\n\treturn w.b\n}\n\
+    \n// WriteBrotliLevel writes brotlied p to w using the given compression level\n\
+    // and returns the number of compressed bytes written to w.\n//\n// Supported\
+    \ compression levels are:\n//\n//   - CompressBrotliNoCompression\n//   - CompressBrotliBestSpeed\n\
+    //   - CompressBrotliBestCompression\n//   - CompressBrotliDefaultCompression\n\
+    func WriteBrotliLevel(w io.Writer, p []byte, level int) (int, error) {\n\tswitch\
+    \ w.(type) {\n\tcase *byteSliceWriter,\n\t\t*bytes.Buffer,\n\t\t*bytebufferpool.ByteBuffer:\n\
+    \t\t// These writers don't block, so we can just use stacklessWriteBrotli\n\t\t\
+    ctx := &compressCtx{\n\t\t\tw:     w,\n\t\t\tp:     p,\n\t\t\tlevel: level,\n\t\
+    \t}\n\t\tstacklessWriteBrotli(ctx)\n\t\treturn len(p), nil\n\tdefault:\n\t\tzw\
+    \ := acquireStacklessBrotliWriter(w, level)\n\t\tn, err := zw.Write(p)\n\t\treleaseStacklessBrotliWriter(zw,\
+    \ level)\n\t\treturn n, err\n\t}\n}\n\nvar (\n\tstacklessWriteBrotliOnce sync.Once\n\
+    \tstacklessWriteBrotliFunc func(ctx any) bool\n)\n\nfunc stacklessWriteBrotli(ctx\
+    \ any) {\n\tstacklessWriteBrotliOnce.Do(func() {\n\t\tstacklessWriteBrotliFunc\
+    \ = stackless.NewFunc(nonblockingWriteBrotli)\n\t})\n\tstacklessWriteBrotliFunc(ctx)\n\
+    }\n\nfunc nonblockingWriteBrotli(ctxv any) {\n\tctx := ctxv.(*compressCtx)\n\t\
+    zw := acquireRealBrotliWriter(ctx.w, ctx.level)\n\n\tzw.Write(ctx.p) //nolint:errcheck\
+    \ // no way to handle this error anyway\n\n\treleaseRealBrotliWriter(zw, ctx.level)\n\
+    }\n\n// WriteBrotli writes brotlied p to w and returns the number of compressed\n\
+    // bytes written to w.\nfunc WriteBrotli(w io.Writer, p []byte) (int, error) {\n\
+    \treturn WriteBrotliLevel(w, p, CompressBrotliDefaultCompression)\n}\n\n// AppendBrotliBytes\
+    \ appends brotlied src to dst and returns the resulting dst.\nfunc AppendBrotliBytes(dst,\
+    \ src []byte) []byte {\n\treturn AppendBrotliBytesLevel(dst, src, CompressBrotliDefaultCompression)\n\
+    }\n\n// WriteUnbrotli writes unbrotlied p to w and returns the number of uncompressed\n\
+    // bytes written to w.\nfunc WriteUnbrotli(w io.Writer, p []byte) (int, error)\
+    \ {\n\tr := &byteSliceReader{b: p}\n\tzr, err := acquireBrotliReader(r)\n\tif\
+    \ err != nil {\n\t\treturn 0, err\n\t}\n\tn, err := copyZeroAlloc(w, zr)\n\treleaseBrotliReader(zr)\n\
+    \tnn := int(n)\n\tif int64(nn) != n {\n\t\treturn 0, fmt.Errorf(\"too much data\
+    \ unbrotlied: %d\", n)\n\t}\n\treturn nn, err\n}\n\n// AppendUnbrotliBytes appends\
+    \ unbrotlied src to dst and returns the resulting dst.\nfunc AppendUnbrotliBytes(dst,\
+    \ src []byte) ([]byte, error) {\n\tw := &byteSliceWriter{b: dst}\n\t_, err :=\
+    \ WriteUnbrotli(w, src)\n\treturn w.b, err\n}\n\n// normalizes compression level\
+    \ into [0..11], so it could be used as an index\n// in *PoolMap.\nfunc normalizeBrotliCompressLevel(level\
+    \ int) int {\n\t// -2 is the lowest compression level - CompressHuffmanOnly\n\t\
+    // 9 is the highest compression level - CompressBestCompression\n\tif level <\
+    \ 0 || level > 11 {\n\t\tlevel = CompressBrotliDefaultCompression\n\t}\n\treturn\
+    \ level\n}\n\n### Source File Dependency Files Content\n### Dependency File: fasthttp\\\
+    brotli_test.go\\dependent_files\\doc.go\n// Package stackless provides functionality\
+    \ that may save stack space\n// for high number of concurrently running goroutines.\n\
+    package stackless\n\n\n### Dependency File: fasthttp\\brotli_test.go\\dependent_files\\\
+    func.go\npackage stackless\n\nimport (\n\t\"runtime\"\n\t\"sync\"\n)\n\n// NewFunc\
+    \ returns stackless wrapper for the function f.\n//\n// Unlike f, the returned\
+    \ stackless wrapper doesn't use stack space\n// on the goroutine that calls it.\n\
+    // The wrapper may save a lot of stack space if the following conditions\n// are\
+    \ met:\n//\n//   - f doesn't contain blocking calls on network, I/O or channels;\n\
+    //   - f uses a lot of stack space;\n//   - the wrapper is called from high number\
+    \ of concurrent goroutines.\n//\n// The stackless wrapper returns false if the\
+    \ call cannot be processed\n// at the moment due to high load.\nfunc NewFunc(f\
+    \ func(ctx any)) func(ctx any) bool {\n\tif f == nil {\n\t\t// developer sanity-check\n\
+    \t\tpanic(\"BUG: f cannot be nil\")\n\t}\n\n\tfuncWorkCh := make(chan *funcWork,\
+    \ runtime.GOMAXPROCS(-1)*2048)\n\tonceInit := func() {\n\t\tn := runtime.GOMAXPROCS(-1)\n\
+    \t\tfor i := 0; i < n; i++ {\n\t\t\tgo funcWorker(funcWorkCh, f)\n\t\t}\n\t}\n\
+    \tvar once sync.Once\n\n\treturn func(ctx any) bool {\n\t\tonce.Do(onceInit)\n\
+    \t\tfw := getFuncWork()\n\t\tfw.ctx = ctx\n\n\t\tselect {\n\t\tcase funcWorkCh\
+    \ <- fw:\n\t\tdefault:\n\t\t\tputFuncWork(fw)\n\t\t\treturn false\n\t\t}\n\t\t\
+    <-fw.done\n\t\tputFuncWork(fw)\n\t\treturn true\n\t}\n}\n\nfunc funcWorker(funcWorkCh\
+    \ <-chan *funcWork, f func(ctx any)) {\n\tfor fw := range funcWorkCh {\n\t\tf(fw.ctx)\n\
+    \t\tfw.done <- struct{}{}\n\t}\n}\n\nfunc getFuncWork() *funcWork {\n\tv := funcWorkPool.Get()\n\
+    \tif v == nil {\n\t\tv = &funcWork{\n\t\t\tdone: make(chan struct{}, 1),\n\t\t\
+    }\n\t}\n\treturn v.(*funcWork)\n}\n\nfunc putFuncWork(fw *funcWork) {\n\tfw.ctx\
+    \ = nil\n\tfuncWorkPool.Put(fw)\n}\n\nvar funcWorkPool sync.Pool\n\ntype funcWork\
+    \ struct {\n\tctx  any\n\tdone chan struct{}\n}\n\n\n### Dependency File: fasthttp\\\
+    brotli_test.go\\dependent_files\\writer.go\npackage stackless\n\nimport (\n\t\"\
+    errors\"\n\t\"fmt\"\n\t\"io\"\n\t\"sync\"\n\n\t\"github.com/valyala/bytebufferpool\"\
+    \n)\n\n// Writer is an interface stackless writer must conform to.\n//\n// The\
+    \ interface contains common subset for Writers from compress/* packages.\ntype\
+    \ Writer interface {\n\tWrite(p []byte) (int, error)\n\tFlush() error\n\tClose()\
+    \ error\n\tReset(w io.Writer)\n}\n\n// NewWriterFunc must return new writer that\
+    \ will be wrapped into\n// stackless writer.\ntype NewWriterFunc func(w io.Writer)\
+    \ Writer\n\n// NewWriter creates a stackless writer around a writer returned\n\
+    // from newWriter.\n//\n// The returned writer writes data to dstW.\n//\n// Writers\
+    \ that use a lot of stack space may be wrapped into stackless writer,\n// thus\
+    \ saving stack space for high number of concurrently running goroutines.\nfunc\
+    \ NewWriter(dstW io.Writer, newWriter NewWriterFunc) Writer {\n\tw := &writer{\n\
+    \t\tdstW: dstW,\n\t}\n\tw.zw = newWriter(&w.xw)\n\treturn w\n}\n\ntype writer\
+    \ struct {\n\tdstW io.Writer\n\tzw   Writer\n\n\terr error\n\txw  xWriter\n\n\t\
+    p []byte\n\tn int\n\n\top op\n}\n\ntype op int\n\nconst (\n\topWrite op = iota\n\
+    \topFlush\n\topClose\n\topReset\n)\n\nfunc (w *writer) Write(p []byte) (int, error)\
+    \ {\n\tw.p = p\n\terr := w.do(opWrite)\n\tw.p = nil\n\treturn w.n, err\n}\n\n\
+    func (w *writer) Flush() error {\n\treturn w.do(opFlush)\n}\n\nfunc (w *writer)\
+    \ Close() error {\n\treturn w.do(opClose)\n}\n\nfunc (w *writer) Reset(dstW io.Writer)\
+    \ {\n\tw.xw.Reset()\n\tw.do(opReset) //nolint:errcheck\n\tw.dstW = dstW\n}\n\n\
+    func (w *writer) do(op op) error {\n\tw.op = op\n\tif !stacklessWriterFunc(w)\
+    \ {\n\t\treturn errHighLoad\n\t}\n\terr := w.err\n\tif err != nil {\n\t\treturn\
+    \ err\n\t}\n\tif w.xw.bb != nil && len(w.xw.bb.B) > 0 {\n\t\t_, err = w.dstW.Write(w.xw.bb.B)\n\
+    \t}\n\tw.xw.Reset()\n\n\treturn err\n}\n\nvar errHighLoad = errors.New(\"cannot\
+    \ compress data due to high load\")\n\nvar (\n\tstacklessWriterFuncOnce sync.Once\n\
+    \tstacklessWriterFuncFunc func(ctx any) bool\n)\n\nfunc stacklessWriterFunc(ctx\
+    \ any) bool {\n\tstacklessWriterFuncOnce.Do(func() {\n\t\tstacklessWriterFuncFunc\
+    \ = NewFunc(writerFunc)\n\t})\n\treturn stacklessWriterFuncFunc(ctx)\n}\n\nfunc\
+    \ writerFunc(ctx any) {\n\tw := ctx.(*writer)\n\tswitch w.op {\n\tcase opWrite:\n\
+    \t\tw.n, w.err = w.zw.Write(w.p)\n\tcase opFlush:\n\t\tw.err = w.zw.Flush()\n\t\
+    case opClose:\n\t\tw.err = w.zw.Close()\n\tcase opReset:\n\t\tw.zw.Reset(&w.xw)\n\
+    \t\tw.err = nil\n\tdefault:\n\t\tpanic(fmt.Sprintf(\"BUG: unexpected op: %d\"\
+    , w.op))\n\t}\n}\n\ntype xWriter struct {\n\tbb *bytebufferpool.ByteBuffer\n}\n\
+    \nfunc (w *xWriter) Write(p []byte) (int, error) {\n\tif w.bb == nil {\n\t\tw.bb\
+    \ = bufferPool.Get()\n\t}\n\treturn w.bb.Write(p)\n}\n\nfunc (w *xWriter) Reset()\
+    \ {\n\tif w.bb != nil {\n\t\tbufferPool.Put(w.bb)\n\t\tw.bb = nil\n\t}\n}\n\n\
+    var bufferPool bytebufferpool.Pool\n\nOutput the complete test file, code only,\
+    \ no explanations.\n### Time\nCurrent time: 2025-03-23 23:28:29\n"
+  role: user

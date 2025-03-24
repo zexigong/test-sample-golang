@@ -1,0 +1,73 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: hugo\nTest File Path: hugo\\filename_filter_test.go\\\
+    filename_filter_test.go\nProject Programming Language: Go\nTesting Framework:\
+    \ go testing\n### Source File Content\n### Source File: hugo\\filename_filter_test.go\\\
+    source_files\\filename_filter.go\n// Copyright 2021 The Hugo Authors. All rights\
+    \ reserved.\n//\n// Licensed under the Apache License, Version 2.0 (the \"License\"\
+    );\n// you may not use this file except in compliance with the License.\n// You\
+    \ may obtain a copy of the License at\n// http://www.apache.org/licenses/LICENSE-2.0\n\
+    //\n// Unless required by applicable law or agreed to in writing, software\n//\
+    \ distributed under the License is distributed on an \"AS IS\" BASIS,\n// WITHOUT\
+    \ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n// See the\
+    \ License for the specific language governing permissions and\n// limitations\
+    \ under the License.\n\npackage glob\n\nimport (\n\t\"path\"\n\t\"path/filepath\"\
+    \n\t\"strings\"\n\n\t\"github.com/gobwas/glob\"\n)\n\ntype FilenameFilter struct\
+    \ {\n\tshouldInclude func(filename string) bool\n\tinclusions    []glob.Glob\n\
+    \tdirInclusions []glob.Glob\n\texclusions    []glob.Glob\n\tisWindows     bool\n\
+    \n\tnested []*FilenameFilter\n}\n\nfunc normalizeFilenameGlobPattern(s string)\
+    \ string {\n\t// Use Unix separators even on Windows.\n\ts = filepath.ToSlash(s)\n\
+    \tif !strings.HasPrefix(s, \"/\") {\n\t\ts = \"/\" + s\n\t}\n\treturn s\n}\n\n\
+    // NewFilenameFilter creates a new Glob where the Match method will\n// return\
+    \ true if the file should be included.\n// Note that the inclusions will be checked\
+    \ first.\nfunc NewFilenameFilter(inclusions, exclusions []string) (*FilenameFilter,\
+    \ error) {\n\tif inclusions == nil && exclusions == nil {\n\t\treturn nil, nil\n\
+    \t}\n\tfilter := &FilenameFilter{isWindows: isWindows}\n\n\tfor _, include :=\
+    \ range inclusions {\n\t\tinclude = normalizeFilenameGlobPattern(include)\n\t\t\
+    g, err := GetGlob(include)\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\
+    \t\tfilter.inclusions = append(filter.inclusions, g)\n\n\t\t// For mounts that\
+    \ do directory walking (e.g. content) we\n\t\t// must make sure that all directories\
+    \ up to this inclusion also\n\t\t// gets included.\n\t\tdir := path.Dir(include)\n\
+    \t\tparts := strings.Split(dir, \"/\")\n\t\tfor i := range parts {\n\t\t\tpattern\
+    \ := \"/\" + filepath.Join(parts[:i+1]...)\n\t\t\tg, err := GetGlob(pattern)\n\
+    \t\t\tif err != nil {\n\t\t\t\treturn nil, err\n\t\t\t}\n\t\t\tfilter.dirInclusions\
+    \ = append(filter.dirInclusions, g)\n\t\t}\n\t}\n\n\tfor _, exclude := range exclusions\
+    \ {\n\t\texclude = normalizeFilenameGlobPattern(exclude)\n\t\tg, err := GetGlob(exclude)\n\
+    \t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\tfilter.exclusions = append(filter.exclusions,\
+    \ g)\n\t}\n\n\treturn filter, nil\n}\n\n// MustNewFilenameFilter invokes NewFilenameFilter\
+    \ and panics on error.\nfunc MustNewFilenameFilter(inclusions, exclusions []string)\
+    \ *FilenameFilter {\n\tfilter, err := NewFilenameFilter(inclusions, exclusions)\n\
+    \tif err != nil {\n\t\tpanic(err)\n\t}\n\treturn filter\n}\n\n// NewFilenameFilterForInclusionFunc\
+    \ create a new filter using the provided inclusion func.\nfunc NewFilenameFilterForInclusionFunc(shouldInclude\
+    \ func(filename string) bool) *FilenameFilter {\n\treturn &FilenameFilter{shouldInclude:\
+    \ shouldInclude, isWindows: isWindows}\n}\n\n// Match returns whether filename\
+    \ should be included.\nfunc (f *FilenameFilter) Match(filename string, isDir bool)\
+    \ bool {\n\tif f == nil {\n\t\treturn true\n\t}\n\tif !f.doMatch(filename, isDir)\
+    \ {\n\t\treturn false\n\t}\n\n\tfor _, nested := range f.nested {\n\t\tif !nested.Match(filename,\
+    \ isDir) {\n\t\t\treturn false\n\t\t}\n\t}\n\n\treturn true\n}\n\n// Append appends\
+    \ a filter to the chain. The receiver will be copied if needed.\nfunc (f *FilenameFilter)\
+    \ Append(other *FilenameFilter) *FilenameFilter {\n\tif f == nil {\n\t\treturn\
+    \ other\n\t}\n\n\tclone := *f\n\tnested := make([]*FilenameFilter, len(clone.nested)+1)\n\
+    \tcopy(nested, clone.nested)\n\tnested[len(nested)-1] = other\n\tclone.nested\
+    \ = nested\n\n\treturn &clone\n}\n\nfunc (f *FilenameFilter) doMatch(filename\
+    \ string, isDir bool) bool {\n\tif f == nil {\n\t\treturn true\n\t}\n\n\tif !strings.HasPrefix(filename,\
+    \ filepathSeparator) {\n\t\tfilename = filepathSeparator + filename\n\t}\n\n\t\
+    if f.shouldInclude != nil {\n\t\tif f.shouldInclude(filename) {\n\t\t\treturn\
+    \ true\n\t\t}\n\t\tif f.isWindows {\n\t\t\t// The Glob matchers below handles\
+    \ this by themselves,\n\t\t\t// for the shouldInclude we need to take some extra\
+    \ steps\n\t\t\t// to make this robust.\n\t\t\twinFilename := filepath.FromSlash(filename)\n\
+    \t\t\tif filename != winFilename {\n\t\t\t\tif f.shouldInclude(winFilename) {\n\
+    \t\t\t\t\treturn true\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\n\t}\n\n\tfor _, inclusion\
+    \ := range f.inclusions {\n\t\tif inclusion.Match(filename) {\n\t\t\treturn true\n\
+    \t\t}\n\t}\n\n\tif isDir && f.inclusions != nil {\n\t\tfor _, inclusion := range\
+    \ f.dirInclusions {\n\t\t\tif inclusion.Match(filename) {\n\t\t\t\treturn true\n\
+    \t\t\t}\n\t\t}\n\t}\n\n\tfor _, exclusion := range f.exclusions {\n\t\tif exclusion.Match(filename)\
+    \ {\n\t\t\treturn false\n\t\t}\n\t}\n\n\treturn f.inclusions == nil && f.shouldInclude\
+    \ == nil\n}\n\n### Source File Dependency Files Content\n### Dependency File:\
+    \ empty.go\n\nOutput the complete test file, code only, no explanations.\n###\
+    \ Time\nCurrent time: 2025-03-23 23:55:43\n"
+  role: user

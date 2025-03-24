@@ -1,0 +1,59 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: hugo\nTest File Path: hugo\\glob_test.go\\\
+    glob_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: hugo\\glob_test.go\\source_files\\glob.go\n\
+    // Copyright 2021 The Hugo Authors. All rights reserved.\n//\n// Licensed under\
+    \ the Apache License, Version 2.0 (the \"License\");\n// you may not use this\
+    \ file except in compliance with the License.\n// You may obtain a copy of the\
+    \ License at\n// http://www.apache.org/licenses/LICENSE-2.0\n//\n// Unless required\
+    \ by applicable law or agreed to in writing, software\n// distributed under the\
+    \ License is distributed on an \"AS IS\" BASIS,\n// WITHOUT WARRANTIES OR CONDITIONS\
+    \ OF ANY KIND, either express or implied.\n// See the License for the specific\
+    \ language governing permissions and\n// limitations under the License.\n\npackage\
+    \ glob\n\nimport (\n\t\"os\"\n\t\"path\"\n\t\"path/filepath\"\n\t\"runtime\"\n\
+    \t\"strings\"\n\t\"sync\"\n\n\t\"github.com/gobwas/glob\"\n\t\"github.com/gobwas/glob/syntax\"\
+    \n)\n\nconst filepathSeparator = string(os.PathSeparator)\n\nvar (\n\tisWindows\
+    \        = runtime.GOOS == \"windows\"\n\tdefaultGlobCache = &globCache{\n\t\t\
+    isWindows: isWindows,\n\t\tcache:     make(map[string]globErr),\n\t}\n)\n\ntype\
+    \ globErr struct {\n\tglob glob.Glob\n\terr  error\n}\n\ntype globCache struct\
+    \ {\n\t// Config\n\tisWindows bool\n\n\t// Cache\n\tsync.RWMutex\n\tcache map[string]globErr\n\
+    }\n\nfunc (gc *globCache) GetGlob(pattern string) (glob.Glob, error) {\n\tvar\
+    \ eg globErr\n\n\tgc.RLock()\n\tvar found bool\n\teg, found = gc.cache[pattern]\n\
+    \tgc.RUnlock()\n\tif found {\n\t\treturn eg.glob, eg.err\n\t}\n\n\tvar g glob.Glob\n\
+    \tvar err error\n\n\tpattern = filepath.ToSlash(pattern)\n\tg, err = glob.Compile(strings.ToLower(pattern),\
+    \ '/')\n\n\teg = globErr{\n\t\tglobDecorator{\n\t\t\tg:         g,\n\t\t\tisWindows:\
+    \ gc.isWindows,\n\t\t},\n\t\terr,\n\t}\n\n\tgc.Lock()\n\tgc.cache[pattern] = eg\n\
+    \tgc.Unlock()\n\n\treturn eg.glob, eg.err\n}\n\n// Or creates a new Glob from\
+    \ the given globs.\nfunc Or(globs ...glob.Glob) glob.Glob {\n\treturn globSlice{globs:\
+    \ globs}\n}\n\n// MatchesFunc is a convenience type to create a glob.Glob from\
+    \ a function.\ntype MatchesFunc func(s string) bool\n\nfunc (m MatchesFunc) Match(s\
+    \ string) bool {\n\treturn m(s)\n}\n\ntype globSlice struct {\n\tglobs []glob.Glob\n\
+    }\n\nfunc (g globSlice) Match(s string) bool {\n\tfor _, g := range g.globs {\n\
+    \t\tif g.Match(s) {\n\t\t\treturn true\n\t\t}\n\t}\n\treturn false\n}\n\ntype\
+    \ globDecorator struct {\n\t// On Windows we may get filenames with Windows slashes\
+    \ to match,\n\t// which we need to normalize.\n\tisWindows bool\n\n\tg glob.Glob\n\
+    }\n\nfunc (g globDecorator) Match(s string) bool {\n\tif g.isWindows {\n\t\ts\
+    \ = filepath.ToSlash(s)\n\t}\n\ts = strings.ToLower(s)\n\treturn g.g.Match(s)\n\
+    }\n\nfunc GetGlob(pattern string) (glob.Glob, error) {\n\treturn defaultGlobCache.GetGlob(pattern)\n\
+    }\n\nfunc NormalizePath(p string) string {\n\treturn strings.ToLower(NormalizePathNoLower(p))\n\
+    }\n\nfunc NormalizePathNoLower(p string) string {\n\treturn strings.Trim(path.Clean(filepath.ToSlash(p)),\
+    \ \"/.\")\n}\n\n// ResolveRootDir takes a normalized path on the form \"assets/**.json\"\
+    \ and\n// determines any root dir, i.e. any start path without any wildcards.\n\
+    func ResolveRootDir(p string) string {\n\tparts := strings.Split(path.Dir(p),\
+    \ \"/\")\n\tvar roots []string\n\tfor _, part := range parts {\n\t\tif HasGlobChar(part)\
+    \ {\n\t\t\tbreak\n\t\t}\n\t\troots = append(roots, part)\n\t}\n\n\tif len(roots)\
+    \ == 0 {\n\t\treturn \"\"\n\t}\n\n\treturn strings.Join(roots, \"/\")\n}\n\n//\
+    \ FilterGlobParts removes any string with glob wildcard.\nfunc FilterGlobParts(a\
+    \ []string) []string {\n\tb := a[:0]\n\tfor _, x := range a {\n\t\tif !HasGlobChar(x)\
+    \ {\n\t\t\tb = append(b, x)\n\t\t}\n\t}\n\treturn b\n}\n\n// HasGlobChar returns\
+    \ whether s contains any glob wildcards.\nfunc HasGlobChar(s string) bool {\n\t\
+    for i := 0; i < len(s); i++ {\n\t\tif syntax.Special(s[i]) {\n\t\t\treturn true\n\
+    \t\t}\n\t}\n\treturn false\n}\n\n### Source File Dependency Files Content\n###\
+    \ Dependency File: empty.go\n\nOutput the complete test file, code only, no explanations.\n\
+    ### Time\nCurrent time: 2025-03-23 23:56:13\n"
+  role: user

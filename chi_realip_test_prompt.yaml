@@ -1,0 +1,37 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: chi\nTest File Path: chi\\realip_test.go\\\
+    realip_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: chi\\realip_test.go\\source_files\\\
+    realip.go\npackage middleware\n\n// Ported from Goji's middleware, source:\n//\
+    \ https://github.com/zenazn/goji/tree/master/web/middleware\n\nimport (\n\t\"\
+    net\"\n\t\"net/http\"\n\t\"strings\"\n)\n\nvar trueClientIP = http.CanonicalHeaderKey(\"\
+    True-Client-IP\")\nvar xForwardedFor = http.CanonicalHeaderKey(\"X-Forwarded-For\"\
+    )\nvar xRealIP = http.CanonicalHeaderKey(\"X-Real-IP\")\n\n// RealIP is a middleware\
+    \ that sets a http.Request's RemoteAddr to the results\n// of parsing either the\
+    \ True-Client-IP, X-Real-IP or the X-Forwarded-For headers\n// (in that order).\n\
+    //\n// This middleware should be inserted fairly early in the middleware stack\
+    \ to\n// ensure that subsequent layers (e.g., request loggers) which examine the\n\
+    // RemoteAddr will see the intended value.\n//\n// You should only use this middleware\
+    \ if you can trust the headers passed to\n// you (in particular, the three headers\
+    \ this middleware uses), for example\n// because you have placed a reverse proxy\
+    \ like HAProxy or nginx in front of\n// chi. If your reverse proxies are configured\
+    \ to pass along arbitrary header\n// values from the client, or if you use this\
+    \ middleware without a reverse\n// proxy, malicious clients will be able to make\
+    \ you very sad (or, depending on\n// how you're using RemoteAddr, vulnerable to\
+    \ an attack of some sort).\nfunc RealIP(h http.Handler) http.Handler {\n\tfn :=\
+    \ func(w http.ResponseWriter, r *http.Request) {\n\t\tif rip := realIP(r); rip\
+    \ != \"\" {\n\t\t\tr.RemoteAddr = rip\n\t\t}\n\t\th.ServeHTTP(w, r)\n\t}\n\n\t\
+    return http.HandlerFunc(fn)\n}\n\nfunc realIP(r *http.Request) string {\n\tvar\
+    \ ip string\n\n\tif tcip := r.Header.Get(trueClientIP); tcip != \"\" {\n\t\tip\
+    \ = tcip\n\t} else if xrip := r.Header.Get(xRealIP); xrip != \"\" {\n\t\tip =\
+    \ xrip\n\t} else if xff := r.Header.Get(xForwardedFor); xff != \"\" {\n\t\tip,\
+    \ _, _ = strings.Cut(xff, \",\")\n\t}\n\tif ip == \"\" || net.ParseIP(ip) == nil\
+    \ {\n\t\treturn \"\"\n\t}\n\treturn ip\n}\n\n### Source File Dependency Files\
+    \ Content\n### Dependency File: empty.go\n\nOutput the complete test file, code\
+    \ only, no explanations.\n### Time\nCurrent time: 2025-03-23 22:49:22\n"
+  role: user

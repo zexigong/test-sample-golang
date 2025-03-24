@@ -1,0 +1,33 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: '### Task Information
+
+    Based on the source code, write/rewrite tests to cover the source code.
+
+    Repository: gin
+
+    Test File Path: gin\logger_test.go\logger_test.go
+
+    Project Programming Language: Go
+
+    Testing Framework: go testing
+
+    ### Source File Content
+
+
+    ### Source File Dependency Files Content
+
+    ### Dependency File: empty.go
+
+
+    Output the complete test file, code only, no explanations.
+
+    ### Time
+
+    Current time: 2025-03-23 23:53:12
+
+    '
+  role: user

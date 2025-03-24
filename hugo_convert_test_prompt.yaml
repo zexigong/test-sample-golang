@@ -1,0 +1,56 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: hugo\nTest File Path: hugo\\convert_test.go\\\
+    convert_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: hugo\\convert_test.go\\source_files\\\
+    convert.go\n// Copyright 2019 The Hugo Authors. All rights reserved.\n//\n// Licensed\
+    \ under the Apache License, Version 2.0 (the \"License\");\n// you may not use\
+    \ this file except in compliance with the License.\n// You may obtain a copy of\
+    \ the License at\n// http://www.apache.org/licenses/LICENSE-2.0\n//\n// Unless\
+    \ required by applicable law or agreed to in writing, software\n// distributed\
+    \ under the License is distributed on an \"AS IS\" BASIS,\n// WITHOUT WARRANTIES\
+    \ OR CONDITIONS OF ANY KIND, either express or implied.\n// See the License for\
+    \ the specific language governing permissions and\n// limitations under the License.\n\
+    \npackage types\n\nimport (\n\t\"encoding/json\"\n\t\"fmt\"\n\t\"html/template\"\
+    \n\t\"reflect\"\n\t\"time\"\n\n\t\"github.com/spf13/cast\"\n)\n\n// ToDuration\
+    \ converts v to time.Duration.\n// See ToDurationE if you need to handle errors.\n\
+    func ToDuration(v any) time.Duration {\n\td, _ := ToDurationE(v)\n\treturn d\n\
+    }\n\n// ToDurationE converts v to time.Duration.\nfunc ToDurationE(v any) (time.Duration,\
+    \ error) {\n\tif n := cast.ToInt(v); n > 0 {\n\t\treturn time.Duration(n) * time.Millisecond,\
+    \ nil\n\t}\n\td, err := time.ParseDuration(cast.ToString(v))\n\tif err != nil\
+    \ {\n\t\treturn 0, fmt.Errorf(\"cannot convert %v to time.Duration\", v)\n\t}\n\
+    \treturn d, nil\n}\n\n// ToStringSlicePreserveString is the same as ToStringSlicePreserveStringE,\n\
+    // but it never fails.\nfunc ToStringSlicePreserveString(v any) []string {\n\t\
+    vv, _ := ToStringSlicePreserveStringE(v)\n\treturn vv\n}\n\n// ToStringSlicePreserveStringE\
+    \ converts v to a string slice.\n// If v is a string, it will be wrapped in a\
+    \ string slice.\nfunc ToStringSlicePreserveStringE(v any) ([]string, error) {\n\
+    \tif v == nil {\n\t\treturn nil, nil\n\t}\n\tif sds, ok := v.(string); ok {\n\t\
+    \treturn []string{sds}, nil\n\t}\n\tresult, err := cast.ToStringSliceE(v)\n\t\
+    if err == nil {\n\t\treturn result, nil\n\t}\n\n\t// Probably []int or similar.\
+    \ Fall back to reflect.\n\tvv := reflect.ValueOf(v)\n\n\tswitch vv.Kind() {\n\t\
+    case reflect.Slice, reflect.Array:\n\t\tresult = make([]string, vv.Len())\n\t\t\
+    for i := 0; i < vv.Len(); i++ {\n\t\t\ts, err := cast.ToStringE(vv.Index(i).Interface())\n\
+    \t\t\tif err != nil {\n\t\t\t\treturn nil, err\n\t\t\t}\n\t\t\tresult[i] = s\n\
+    \t\t}\n\t\treturn result, nil\n\tdefault:\n\t\treturn nil, fmt.Errorf(\"failed\
+    \ to convert %T to a string slice\", v)\n\t}\n}\n\n// TypeToString converts v\
+    \ to a string if it's a valid string type.\n// Note that this will not try to\
+    \ convert numeric values etc.,\n// use ToString for that.\nfunc TypeToString(v\
+    \ any) (string, bool) {\n\tswitch s := v.(type) {\n\tcase string:\n\t\treturn\
+    \ s, true\n\tcase template.HTML:\n\t\treturn string(s), true\n\tcase template.CSS:\n\
+    \t\treturn string(s), true\n\tcase template.HTMLAttr:\n\t\treturn string(s), true\n\
+    \tcase template.JS:\n\t\treturn string(s), true\n\tcase template.JSStr:\n\t\t\
+    return string(s), true\n\tcase template.URL:\n\t\treturn string(s), true\n\tcase\
+    \ template.Srcset:\n\t\treturn string(s), true\n\t}\n\n\treturn \"\", false\n\
+    }\n\n// ToString converts v to a string.\nfunc ToString(v any) string {\n\ts,\
+    \ _ := ToStringE(v)\n\treturn s\n}\n\n// ToStringE converts v to a string.\nfunc\
+    \ ToStringE(v any) (string, error) {\n\tif s, ok := TypeToString(v); ok {\n\t\t\
+    return s, nil\n\t}\n\n\tswitch s := v.(type) {\n\tcase json.RawMessage:\n\t\t\
+    return string(s), nil\n\tdefault:\n\t\treturn cast.ToStringE(v)\n\t}\n}\n\n###\
+    \ Source File Dependency Files Content\n### Dependency File: empty.go\n\nOutput\
+    \ the complete test file, code only, no explanations.\n### Time\nCurrent time:\
+    \ 2025-03-23 23:54:39\n"
+  role: user

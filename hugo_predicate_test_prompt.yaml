@@ -1,0 +1,40 @@
+messages:
+- content: You are an AI agent expert in writing unit tests. Your task is to write
+    unit tests for the given Go code files of the repository. Make sure the tests
+    can be executed without lint or compile errors.
+  role: system
+- content: "### Task Information\nBased on the source code, write/rewrite tests to\
+    \ cover the source code.\nRepository: hugo\nTest File Path: hugo\\predicate_test.go\\\
+    predicate_test.go\nProject Programming Language: Go\nTesting Framework: go testing\n\
+    ### Source File Content\n### Source File: hugo\\predicate_test.go\\source_files\\\
+    predicate.go\n// Copyright 2024 The Hugo Authors. All rights reserved.\n//\n//\
+    \ Licensed under the Apache License, Version 2.0 (the \"License\");\n// you may\
+    \ not use this file except in compliance with the License.\n// You may obtain\
+    \ a copy of the License at\n// http://www.apache.org/licenses/LICENSE-2.0\n//\n\
+    // Unless required by applicable law or agreed to in writing, software\n// distributed\
+    \ under the License is distributed on an \"AS IS\" BASIS,\n// WITHOUT WARRANTIES\
+    \ OR CONDITIONS OF ANY KIND, either express or implied.\n// See the License for\
+    \ the specific language governing permissions and\n// limitations under the License.\n\
+    \npackage predicate\n\n// P is a predicate function that tests whether a value\
+    \ of type T satisfies some condition.\ntype P[T any] func(T) bool\n\n// And returns\
+    \ a predicate that is a short-circuiting logical AND of this and the given predicates.\n\
+    func (p P[T]) And(ps ...P[T]) P[T] {\n\treturn func(v T) bool {\n\t\tfor _, pp\
+    \ := range ps {\n\t\t\tif !pp(v) {\n\t\t\t\treturn false\n\t\t\t}\n\t\t}\n\t\t\
+    if p == nil {\n\t\t\treturn true\n\t\t}\n\t\treturn p(v)\n\t}\n}\n\n// Or returns\
+    \ a predicate that is a short-circuiting logical OR of this and the given predicates.\n\
+    func (p P[T]) Or(ps ...P[T]) P[T] {\n\treturn func(v T) bool {\n\t\tfor _, pp\
+    \ := range ps {\n\t\t\tif pp(v) {\n\t\t\t\treturn true\n\t\t\t}\n\t\t}\n\t\tif\
+    \ p == nil {\n\t\t\treturn false\n\t\t}\n\t\treturn p(v)\n\t}\n}\n\n// Negate\
+    \ returns a predicate that is a logical negation of this predicate.\nfunc (p P[T])\
+    \ Negate() P[T] {\n\treturn func(v T) bool {\n\t\treturn !p(v)\n\t}\n}\n\n// Filter\
+    \ returns a new slice holding only the elements of s that satisfy p.\n// Filter\
+    \ modifies the contents of the slice s and returns the modified slice, which may\
+    \ have a smaller length.\nfunc (p P[T]) Filter(s []T) []T {\n\tvar n int\n\tfor\
+    \ _, v := range s {\n\t\tif p(v) {\n\t\t\ts[n] = v\n\t\t\tn++\n\t\t}\n\t}\n\t\
+    return s[:n]\n}\n\n// FilterCopy returns a new slice holding only the elements\
+    \ of s that satisfy p.\nfunc (p P[T]) FilterCopy(s []T) []T {\n\tvar result []T\n\
+    \tfor _, v := range s {\n\t\tif p(v) {\n\t\t\tresult = append(result, v)\n\t\t\
+    }\n\t}\n\treturn result\n}\n\n### Source File Dependency Files Content\n### Dependency\
+    \ File: empty.go\n\nOutput the complete test file, code only, no explanations.\n\
+    ### Time\nCurrent time: 2025-03-23 23:56:46\n"
+  role: user
